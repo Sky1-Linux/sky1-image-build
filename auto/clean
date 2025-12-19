@@ -1,0 +1,9 @@
+#!/bin/sh
+# Sky1 Linux live-build clean script
+
+set -e
+
+lb clean noauto "${@}"
+
+# Preserve download caches
+rm -f build.log

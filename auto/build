@@ -1,0 +1,6 @@
+#!/bin/sh
+# Sky1 Linux live-build build script
+
+set -e
+
+lb build noauto "${@}" 2>&1 | tee build.log

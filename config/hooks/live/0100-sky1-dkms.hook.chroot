@@ -1,0 +1,28 @@
+#!/bin/bash
+# Pre-build DKMS modules for live environment
+
+set -e
+
+echo "Building DKMS modules for live environment..."
+
+# Find Sky1 kernel version
+KERNEL_VERSION=$(ls /lib/modules/ | grep sky1 | head -1)
+
+if [ -z "$KERNEL_VERSION" ]; then
+    echo "ERROR: No Sky1 kernel found in /lib/modules/"
+    exit 1
+fi
+
+echo "Kernel version: $KERNEL_VERSION"
+
+# Build each DKMS module
+for mod in r8126 sky1-vpu; do
+    if dkms status -m "$mod" 2>/dev/null | grep -q "$KERNEL_VERSION"; then
+        echo "  $mod: already built"
+    else
+        echo "  $mod: building..."
+        dkms autoinstall -k "$KERNEL_VERSION" -m "$mod" || echo "  $mod: build failed (may be optional)"
+    fi
+done
+
+echo "DKMS module build complete."

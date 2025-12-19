@@ -1,0 +1,52 @@
+# KDE Plasma Desktop
+task-kde-desktop
+sddm
+
+# Network
+network-manager
+network-manager-gnome
+
+# Audio
+pipewire
+pipewire-pulse
+wireplumber
+
+# Graphics (Mesa with Panthor)
+mesa-vulkan-drivers
+mesa-va-drivers
+libgl1-mesa-dri
+
+# Firmware
+firmware-linux
+firmware-realtek
+firmware-iwlwifi
+
+# CLI utilities
+sudo
+htop
+btop
+neovim
+curl
+wget
+git
+file
+less
+bash-completion
+tmux
+rsync
+
+# KDE apps
+dolphin
+ark
+kate
+konsole
+gwenview
+okular
+spectacle
+
+# System tools
+gparted
+gnome-disk-utility
+
+# Development
+build-essential

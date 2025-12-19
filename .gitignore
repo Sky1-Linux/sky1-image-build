@@ -1,0 +1,22 @@
+# Build artifacts
+*.iso
+*.log
+*.hybrid.iso
+*.contents
+*.files
+*.packages
+
+# live-build directories
+.build/
+cache/
+chroot/
+binary/
+source/
+
+# Generated config
+config/binary
+config/bootstrap
+config/build
+config/chroot
+config/common
+config/source

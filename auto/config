@@ -1,0 +1,23 @@
+#!/bin/sh
+# Sky1 Linux live-build configuration
+
+set -e
+
+lb config noauto \
+    --distribution sid \
+    --architecture arm64 \
+    --bootloaders grub-efi \
+    --binary-images iso-hybrid \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --apt-recommends true \
+    --apt-source-archives false \
+    --firmware-binary true \
+    --firmware-chroot true \
+    --memtest none \
+    --win32-loader false \
+    --iso-application "Sky1 Linux" \
+    --iso-publisher "Sky1-Linux; https://github.com/Sky1-Linux" \
+    --iso-volume "Sky1 Linux 1.0" \
+    --image-name "sky1-linux" \
+    --debootstrap-options "--include=apt-transport-https,ca-certificates" \
+    "${@}"

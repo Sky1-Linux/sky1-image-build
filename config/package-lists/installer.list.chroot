@@ -1,0 +1,13 @@
+# Calamares installer (live environment only)
+calamares
+calamares-settings-sky1
+os-prober
+squashfs-tools
+
+# Required for installation
+rsync
+cryptsetup
+dosfstools
+e2fsprogs
+btrfs-progs
+lvm2
