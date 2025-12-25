@@ -1,6 +1,63 @@
-#!/bin/sh
+#!/bin/bash
 # Sky1 Linux live-build build script
+# Builds complete ISO ready for deployment
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "=== Sky1 Linux Live Build ==="
+echo "Working directory: $SCRIPT_DIR"
+echo ""
+
+# Run live-build
 lb build noauto "${@}" 2>&1 | tee build.log
+
+# Check if build succeeded
+if [ ! -d "binary" ]; then
+    echo "ERROR: Build failed - no binary directory"
+    exit 1
+fi
+
+# Run binary hook manually if needed (in case it didn't run)
+if [ ! -f "binary/live/vmlinuz" ] && [ -f "config/hooks/binary/0100-sky1-grub-dtb.hook.binary" ]; then
+    echo ""
+    echo "Running binary hook..."
+    bash config/hooks/binary/0100-sky1-grub-dtb.hook.binary
+fi
+
+# Verify boot files exist
+if [ ! -f "binary/live/vmlinuz" ] || [ ! -f "binary/live/initrd.img" ]; then
+    echo "ERROR: Boot files missing in binary/live/"
+    ls -la binary/live/
+    exit 1
+fi
+
+# Check for EFI image
+if [ ! -f "binary/boot/grub/efi.img" ]; then
+    echo "ERROR: EFI image not found at binary/boot/grub/efi.img"
+    exit 1
+fi
+
+# Generate ISO
+echo ""
+echo "=== Generating ISO ==="
+ISO_NAME="sky1-linux-$(date +%Y%m%d).iso"
+
+xorriso -as mkisofs \
+    -r -J -joliet-long -l -iso-level 3 \
+    -A "Sky1 Linux" \
+    -V "SKY1_LIVE" \
+    -e boot/grub/efi.img \
+    -no-emul-boot \
+    -append_partition 2 0xef binary/boot/grub/efi.img \
+    -o "$ISO_NAME" \
+    binary/
+
+echo ""
+echo "=== Build Complete ==="
+ls -lh "$ISO_NAME"
+echo ""
+echo "To deploy to test partition:"
+echo "  ./scripts/deploy-test.sh $ISO_NAME"
