@@ -23,4 +23,16 @@ EOF
 mkdir -p /etc/NetworkManager/system-connections
 chmod 700 /etc/NetworkManager/system-connections
 
-echo "NetworkManager configured for live environment."
+# Disable KWallet secret service API system-wide
+# This prevents KWallet from advertising as a secret agent
+mkdir -p /etc/xdg
+cat > /etc/xdg/kwalletrc << 'EOF'
+[Wallet]
+Enabled=false
+First Use=false
+
+[org.freedesktop.secrets]
+apiEnabled=false
+EOF
+
+echo "NetworkManager and KWallet configured for live environment."

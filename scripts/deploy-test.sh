@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 # Configuration
-TEST_PARTITION="${TEST_PARTITION:-/dev/sda4}"
+TEST_PARTITION="${TEST_PARTITION:-/dev/nvme0n1p4}"
 EFI_MOUNT="${EFI_MOUNT:-/boot/efi}"
 
 # Find ISO
