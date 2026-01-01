@@ -97,6 +97,8 @@ copy_live_to ()
 		fi
 
 		umount ${copyfrom}
+		# Brief delay to let system stabilize after heavy I/O
+		sleep 2
 		mount -r -o move ${copyto} ${copyfrom}
 	fi
 

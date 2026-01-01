@@ -11,3 +11,7 @@ dosfstools
 e2fsprogs
 btrfs-progs
 lvm2
+
+# Bootloader (ARM64 UEFI)
+grub-efi-arm64
+efibootmgr

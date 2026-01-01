@@ -1,0 +1,13 @@
+[Unit]
+Description=Detect connected display and configure X
+DefaultDependencies=no
+Before=lightdm.service display-manager.service
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/detect-display.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

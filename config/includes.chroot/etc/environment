@@ -1,0 +1,7 @@
+# Sky1 Linux environment configuration
+
+# GStreamer: disable GL DMABuf (causes issues with V4L2 decoders)
+GST_GL_DMABUF_DISABLE=1
+
+# Firefox: enable Wayland native mode
+MOZ_ENABLE_WAYLAND=1

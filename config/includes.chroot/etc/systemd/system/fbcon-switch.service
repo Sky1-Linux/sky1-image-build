@@ -1,0 +1,8 @@
+[Unit]
+Description=Switch to VT2 when linlondp display becomes available
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 0.3
+ExecStart=/usr/bin/chvt 2

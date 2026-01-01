@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable ASPM for RTL8126 NICs
+After=network-pre.target systemd-modules-load.service
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/enable-rtl8126-aspm.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

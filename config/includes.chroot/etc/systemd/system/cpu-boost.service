@@ -1,0 +1,11 @@
+[Unit]
+Description=Enable CPU frequency boost
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo 1 > /sys/devices/system/cpu/cpufreq/boost'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

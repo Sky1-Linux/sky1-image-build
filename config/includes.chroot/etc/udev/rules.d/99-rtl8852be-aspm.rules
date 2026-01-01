@@ -1,0 +1,3 @@
+# RTL8852BE WiFi: Disable L1.2 ASPM substate (causes Bad TLP errors)
+# Keep L0s, L1, L1.1 enabled for power savings
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10ec", ATTR{device}=="0xb852", ATTR{link/l1_2_aspm}="0"

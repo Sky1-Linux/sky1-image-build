@@ -24,6 +24,7 @@ less
 bash-completion
 tmux
 rsync
+linux-cpupower
 
 # KDE apps
 dolphin

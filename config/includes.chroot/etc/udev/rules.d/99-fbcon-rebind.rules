@@ -1,0 +1,2 @@
+# Trigger systemd service when linlondp framebuffer becomes available
+ACTION=="add", SUBSYSTEM=="graphics", ATTR{name}=="linlondpdrmfb", TAG+="systemd", ENV{SYSTEMD_WANTS}="fbcon-switch.service"
