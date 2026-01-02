@@ -40,6 +40,14 @@ if [ ! -f "binary/boot/grub/efi.img" ]; then
     exit 1
 fi
 
+# Copy custom grub.cfg (live-build doesn't use our custom config for arm64)
+if [ -f "config/bootloaders/grub-efi/grub.cfg" ]; then
+    echo ""
+    echo "Installing custom grub.cfg..."
+    cp config/bootloaders/grub-efi/grub.cfg binary/boot/grub/grub.cfg
+    echo "Custom grub.cfg installed"
+fi
+
 # Generate ISO
 echo ""
 echo "=== Generating ISO ==="
