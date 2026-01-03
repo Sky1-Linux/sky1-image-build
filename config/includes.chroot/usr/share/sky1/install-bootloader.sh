@@ -43,7 +43,7 @@ fi
 
 echo "EFI mount: $EFI_MOUNT"
 
-PATCHED_GRUB="$CHROOT/usr/share/sky1/grubaa64-sky1.efi"
+PATCHED_GRUB="$CHROOT/usr/share/sky1/grubaa64-install.efi"
 
 # Get root partition UUID from fstab
 ROOT_UUID=$(grep -E '^\s*UUID=[^ ]+\s+/\s' "$CHROOT/etc/fstab" | grep -oP 'UUID=\K[^ ]+' | head -1)
