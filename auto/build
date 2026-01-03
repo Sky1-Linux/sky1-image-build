@@ -40,13 +40,39 @@ if [ ! -f "binary/boot/grub/efi.img" ]; then
     exit 1
 fi
 
-# Copy custom grub.cfg (live-build doesn't use our custom config for arm64)
-if [ -f "config/bootloaders/grub-efi/grub.cfg" ]; then
-    echo ""
-    echo "Installing custom grub.cfg..."
-    cp config/bootloaders/grub-efi/grub.cfg binary/boot/grub/grub.cfg
-    echo "Custom grub.cfg installed"
+# Patch EFI image with Sky1 GRUB and config
+echo ""
+echo "Patching EFI image..."
+EFI_MOUNT=$(mktemp -d)
+mount -o loop binary/boot/grub/efi.img "$EFI_MOUNT"
+
+# Install patched Sky1 GRUB
+if [ -f "config/includes.chroot/usr/share/sky1/grubaa64-sky1.efi" ]; then
+    cp config/includes.chroot/usr/share/sky1/grubaa64-sky1.efi "$EFI_MOUNT/EFI/boot/bootaa64.efi"
+    cp config/includes.chroot/usr/share/sky1/grubaa64-sky1.efi "$EFI_MOUNT/EFI/boot/grubaa64.efi"
+    echo "Installed patched Sky1 GRUB"
 fi
+
+# Copy GRUB config to /GRUB/grub.cfg (patched GRUB looks for lowercase grub.cfg)
+mkdir -p "$EFI_MOUNT/GRUB"
+rm -f "$EFI_MOUNT/GRUB/"*.CFG "$EFI_MOUNT/GRUB/"*.cfg 2>/dev/null || true
+if [ -f "config/bootloaders/grub-efi/grub.cfg" ]; then
+    cp config/bootloaders/grub-efi/grub.cfg "$EFI_MOUNT/GRUB/grub.cfg"
+    echo "Installed GRUB config"
+fi
+
+umount "$EFI_MOUNT"
+rmdir "$EFI_MOUNT"
+echo "EFI image patched"
+
+# Also copy GRUB config to ISO filesystem at /GRUB (where GRUB prefix points)
+mkdir -p binary/GRUB
+cp config/bootloaders/grub-efi/grub.cfg binary/GRUB/grub.cfg
+# Also copy patched GRUB to ISO EFI directory
+mkdir -p binary/EFI/boot
+cp config/includes.chroot/usr/share/sky1/grubaa64-sky1.efi binary/EFI/boot/bootaa64.efi
+cp config/includes.chroot/usr/share/sky1/grubaa64-sky1.efi binary/EFI/boot/grubaa64.efi
+echo "Copied GRUB and config to ISO filesystem"
 
 # Generate ISO
 echo ""
