@@ -26,3 +26,4 @@ config/source
 # Additional build artifacts
 binary.modified_timestamps
 chroot.packages.*
+stashed/
