@@ -1,0 +1,3 @@
+# Minimal loadout
+# Just the desktop environment with no additional applications
+# (Base packages from base.list.chroot are still included)

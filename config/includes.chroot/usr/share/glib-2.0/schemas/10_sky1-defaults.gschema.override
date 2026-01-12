@@ -1,0 +1,8 @@
+# Sky1 Linux GNOME defaults
+
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/gnome/adwaita-d.jxl'
+picture-uri-dark='file:///usr/share/backgrounds/gnome/adwaita-d.jxl'
+
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'

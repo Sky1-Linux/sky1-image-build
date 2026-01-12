@@ -1,0 +1,38 @@
+# Server loadout
+# Additional packages for headless server deployments
+# (base packages already include monitoring, networking, scripting basics)
+
+# ===== Remote Access =====
+openssh-server
+mosh
+
+# ===== Containers =====
+docker.io
+docker-compose
+podman
+buildah
+skopeo
+
+# ===== Advanced Monitoring =====
+nethogs
+iftop
+nmon
+prometheus-node-exporter
+
+# ===== Security =====
+fail2ban
+ufw
+apparmor
+apparmor-utils
+
+# ===== Advanced Networking =====
+nmap
+socat
+netcat-openbsd
+haproxy
+
+# ===== Web Servers =====
+nginx
+
+# ===== Automation =====
+ansible

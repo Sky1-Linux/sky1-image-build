@@ -1,5 +1,8 @@
 # Sky1 Linux environment configuration
 
+# Hardware video decode via V4L2
+LIBVA_DRIVER_NAME=v4l2
+
 # GStreamer: disable GL DMABuf (causes issues with V4L2 decoders)
 GST_GL_DMABUF_DISABLE=1
 

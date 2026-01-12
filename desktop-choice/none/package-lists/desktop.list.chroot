@@ -1,0 +1,8 @@
+# Headless (no desktop environment)
+# Only essential packages for server/CLI use
+
+# SSH server for remote access
+openssh-server
+
+# TTY improvements
+screen

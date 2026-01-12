@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Thunar Volume Manager configuration for LIVE environment -->
+<!-- Automount disabled to prevent unwanted mounting of internal drives -->
+<channel name="thunar-volman" version="1.0">
+  <property name="automount-drives" type="bool" value="false"/>
+  <property name="automount-media" type="bool" value="false"/>
+  <property name="autobrowse" type="bool" value="false"/>
+</channel>

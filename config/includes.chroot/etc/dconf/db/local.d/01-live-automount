@@ -1,0 +1,6 @@
+# Disable automount for LIVE environment
+# Prevents unwanted mounting of internal drives during live session
+
+[org/gnome/desktop/media-handling]
+automount=false
+automount-open=false

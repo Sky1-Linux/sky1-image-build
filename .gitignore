@@ -1,5 +1,7 @@
 # Build artifacts
 *.iso
+*.img
+*.img.xz
 *.log
 *.hybrid.iso
 *.contents

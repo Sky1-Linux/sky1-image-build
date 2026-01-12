@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Thunar Volume Manager configuration for INSTALLED system -->
+<!-- Automount enabled (default behavior) -->
+<channel name="thunar-volman" version="1.0">
+  <property name="automount-drives" type="bool" value="true"/>
+  <property name="automount-media" type="bool" value="true"/>
+  <property name="autobrowse" type="bool" value="true"/>
+</channel>

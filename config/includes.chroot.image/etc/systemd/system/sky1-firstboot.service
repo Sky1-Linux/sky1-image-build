@@ -1,0 +1,14 @@
+[Unit]
+Description=Sky1 Linux First Boot Configuration
+ConditionPathExists=!/var/lib/sky1/.firstboot-done
+Before=gdm.service sddm.service lightdm.service display-manager.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/sky1/firstboot.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

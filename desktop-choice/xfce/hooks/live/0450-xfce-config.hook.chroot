@@ -1,0 +1,79 @@
+#!/bin/bash
+# XFCE desktop configuration for Sky1 Linux
+# Creates BASE configuration - live/image specific settings come from overlay files
+
+set -e
+
+echo "Configuring XFCE (base settings)..."
+
+# Set LightDM as default display manager
+echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
+
+# Configure LightDM base settings (NO autologin - live overlay adds it)
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/50-session.conf << 'EOF'
+[Seat:*]
+user-session=xfce
+EOF
+
+# Pre-configure XFCE panel to avoid first-run dialog
+mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
+
+# Mark panel as already configured
+cat > /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0">
+  <property name="configver" type="int" value="2"/>
+  <property name="panels" type="array">
+    <value type="int" value="1"/>
+  </property>
+  <property name="panel-1" type="empty">
+    <property name="position" type="string" value="p=6;x=0;y=0"/>
+    <property name="length" type="uint" value="100"/>
+    <property name="position-locked" type="bool" value="true"/>
+    <property name="size" type="uint" value="28"/>
+  </property>
+</channel>
+EOF
+
+# Pre-configure desktop icons
+cat > /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0">
+  <property name="desktop-icons" type="empty">
+    <property name="style" type="int" value="2"/>
+    <property name="file-icons" type="empty">
+      <property name="show-home" type="bool" value="false"/>
+      <property name="show-filesystem" type="bool" value="false"/>
+      <property name="show-trash" type="bool" value="false"/>
+      <property name="show-removable" type="bool" value="false"/>
+    </property>
+  </property>
+</channel>
+EOF
+
+# Enable xfwm4 compositing for GPU acceleration
+cat > /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="true"/>
+    <property name="vblank_mode" type="string" value="auto"/>
+  </property>
+</channel>
+EOF
+
+# NetworkManager config
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/10-secrets.conf << 'EOF'
+[main]
+auth-polkit=true
+
+[keyfile]
+unmanaged-devices=none
+EOF
+
+mkdir -p /etc/NetworkManager/system-connections
+chmod 700 /etc/NetworkManager/system-connections
+
+echo "XFCE base configuration complete."

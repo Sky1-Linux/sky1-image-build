@@ -1,0 +1,134 @@
+# Base packages for all Sky1 Linux builds
+# These are essential system packages shared across all desktops and loadouts
+
+# ===== Networking =====
+network-manager
+wpasupplicant
+wireless-regdb
+iw
+rfkill
+avahi-daemon
+openssh-client
+
+# ===== Bluetooth =====
+bluez
+bluez-obexd
+
+# ===== Audio =====
+pipewire
+pipewire-pulse
+pipewire-alsa
+pipewire-audio
+wireplumber
+alsa-utils
+alsa-ucm-conf
+
+# ===== Firmware =====
+firmware-linux
+firmware-realtek
+firmware-iwlwifi
+
+# ===== Graphics (Mesa/Vulkan) =====
+mesa-vulkan-drivers
+libgl1-mesa-dri
+libegl-mesa0
+libgles2
+libglx-mesa0
+vulkan-tools
+
+# ===== D-Bus and PolicyKit =====
+dbus
+dbus-user-session
+polkitd
+pkexec
+
+# ===== Power Management =====
+linux-cpupower
+powertop
+lm-sensors
+i2c-tools
+
+# ===== CLI Utilities =====
+sudo
+curl
+wget
+git
+file
+less
+tree
+htop
+btop
+neovim
+nano
+tmux
+rsync
+unzip
+zip
+xz-utils
+bzip2
+gzip
+strace
+lsof
+bash-completion
+plocate
+
+# ===== Filesystems =====
+nfs-common
+cifs-utils
+sshfs
+ntfs-3g
+exfatprogs
+dosfstools
+e2fsprogs
+btrfs-progs
+xfsprogs
+
+# ===== System Tools =====
+gparted
+gnome-disk-utility
+smartmontools
+parted
+fdisk
+gdisk
+
+# ===== Printing =====
+cups
+cups-browsed
+printer-driver-all
+
+# ===== Localization =====
+locales
+console-setup
+keyboard-configuration
+
+# ===== Monitoring =====
+iotop
+sysstat
+dstat
+
+# ===== Network Tools =====
+net-tools
+iproute2
+iptables
+nftables
+tcpdump
+mtr-tiny
+dnsutils
+traceroute
+
+# ===== Process Management =====
+systemd-cron
+
+# ===== Log Management =====
+logrotate
+
+# ===== Backup =====
+borgbackup
+rclone
+
+# ===== Scripting =====
+jq
+python3
+python3-pip
+python3-venv
+# uv - install via hook (not in Debian repos)

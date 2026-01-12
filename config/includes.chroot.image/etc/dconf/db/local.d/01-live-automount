@@ -1,0 +1,6 @@
+# Automount settings for INSTALLED system
+# Re-enable automount (default GNOME behavior)
+
+[org/gnome/desktop/media-handling]
+automount=true
+automount-open=true

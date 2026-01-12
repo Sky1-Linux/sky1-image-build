@@ -1,0 +1,47 @@
+#!/bin/bash
+# KDE Plasma desktop configuration for Sky1 Linux
+# Creates BASE configuration - live/image specific settings come from overlay files
+
+set -e
+
+echo "Configuring KDE Plasma (base settings)..."
+
+# Disable KWallet - it has bugs with first-time WiFi password entry
+mkdir -p /etc/xdg
+cat > /etc/xdg/kwalletrc << 'EOF'
+[Wallet]
+Enabled=false
+First Use=false
+
+[org.freedesktop.secrets]
+apiEnabled=false
+EOF
+
+# NetworkManager: store secrets in files, not KWallet
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/10-secrets.conf << 'EOF'
+[main]
+auth-polkit=true
+
+[keyfile]
+unmanaged-devices=none
+EOF
+
+mkdir -p /etc/NetworkManager/system-connections
+chmod 700 /etc/NetworkManager/system-connections
+
+# Set SDDM as default display manager
+echo "/usr/bin/sddm" > /etc/X11/default-display-manager
+
+# Configure SDDM for Wayland session (NO autologin - live overlay adds it)
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/10-wayland.conf << 'EOF'
+[General]
+DisplayServer=wayland
+GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+
+[Wayland]
+SessionDir=/usr/share/wayland-sessions
+EOF
+
+echo "KDE base configuration complete."

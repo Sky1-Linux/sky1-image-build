@@ -1,0 +1,12 @@
+# Pin Sky1 repo packages higher than Debian
+Package: firefox firefox-*
+Pin: origin sky1-linux.github.io
+Pin-Priority: 1000
+
+Package: chromium chromium-*
+Pin: origin sky1-linux.github.io
+Pin-Priority: 1000
+
+Package: ffmpeg libavcodec* libavformat* libavutil* libswscale* libswresample* libavfilter* libavdevice*
+Pin: origin sky1-linux.github.io
+Pin-Priority: 1000

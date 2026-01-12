@@ -1,0 +1,15 @@
+# KDE Plasma Desktop
+task-kde-desktop
+sddm
+
+# KDE Applications
+dolphin
+ark
+kate
+konsole
+gwenview
+okular
+kde-spectacle
+
+# KDE Integration
+qml6-module-qtnetwork

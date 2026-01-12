@@ -1,0 +1,27 @@
+# Desktop loadout
+# Full desktop experience with browsers, office, and multimedia
+
+# ===== Web Browsers =====
+# (firefox and chromium are in sky1.list.chroot with HW accel configs)
+
+# ===== Office Suite =====
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gtk3
+
+# ===== Multimedia =====
+vlc
+rhythmbox
+gnome-snapshot
+shotwell
+
+# ===== Graphics =====
+gimp
+inkscape
+
+# ===== Communication =====
+thunderbird
+
+# ===== PDF =====
+# (evince/okular/atril provided by desktop choice)

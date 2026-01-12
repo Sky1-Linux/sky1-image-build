@@ -1,0 +1,117 @@
+# Developer loadout
+# Development tools, compilers, programming languages, and ML/science
+
+# ===== Version Control =====
+git-lfs
+gitk
+git-gui
+tig
+gh
+
+# ===== Build Tools =====
+build-essential
+cmake
+ninja-build
+meson
+autoconf
+automake
+libtool
+pkg-config
+ccache
+
+# ===== C/C++ =====
+gcc
+g++
+clang
+llvm
+gdb
+valgrind
+clang-format
+clang-tidy
+
+# ===== Rust =====
+rustc
+cargo
+rustfmt
+
+# ===== Go =====
+golang
+
+# ===== Java =====
+default-jdk
+
+# ===== Debugging =====
+ltrace
+linux-perf
+
+# ===== Documentation =====
+man-db
+manpages-dev
+devhelp
+
+# ===== Development Libraries =====
+libssl-dev
+libcurl4-openssl-dev
+libsqlite3-dev
+libpq-dev
+libffi-dev
+libxml2-dev
+libreadline-dev
+zlib1g-dev
+libgmp-dev
+libopenblas-dev
+liblapack-dev
+libhdf5-dev
+
+# ===== Containers =====
+docker.io
+docker-compose
+
+# ===== Kernel Development =====
+dkms
+libelf-dev
+libncurses-dev
+flex
+bison
+bc
+
+# ===== ARM64 Specific =====
+device-tree-compiler
+u-boot-tools
+
+# ===== Python Development =====
+python3-dev
+ipython3
+
+# ===== Data Science / ML =====
+python3-numpy
+python3-pandas
+python3-matplotlib
+python3-scipy
+python3-sklearn
+python3-sympy
+python3-xgboost
+
+# ===== Computer Vision =====
+python3-opencv
+python3-pil
+
+# ===== Jupyter =====
+jupyter
+python3-notebook
+python3-ipykernel
+python3-ipywidgets
+
+# ===== Database Clients =====
+sqlite3
+postgresql-client
+
+# ===== Additional Editors =====
+emacs-nox
+
+# ===== Code Quality =====
+shellcheck
+
+# ===== Scientific Computing =====
+octave
+gnuplot

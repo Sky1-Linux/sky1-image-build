@@ -1,0 +1,9 @@
+# Disk image specific packages
+# These are only included in disk images, not live ISOs
+
+# First-boot partition expansion
+cloud-guest-utils
+parted
+
+# Setup wizard GUI
+yad

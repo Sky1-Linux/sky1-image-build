@@ -1,0 +1,16 @@
+#!/bin/bash
+# Install uv (fast Python package installer) for all users
+
+set -e
+
+echo "Installing uv..."
+
+# Install uv system-wide
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local" sh
+
+# Verify installation
+if [ -x /usr/local/bin/uv ]; then
+    echo "uv installed: $(uv --version)"
+else
+    echo "Warning: uv installation may have failed"
+fi
