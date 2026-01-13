@@ -132,9 +132,24 @@ chroot "$MOUNT_DIR" apt-get remove -y --purge \
     live-boot live-config live-config-systemd live-tools \
     calamares calamares-settings-sky1 2>/dev/null || true
 
-# Install disk image specific packages
+# Install disk image specific packages (desktop-aware)
 chroot "$MOUNT_DIR" apt-get update -qq
-chroot "$MOUNT_DIR" apt-get install -y -qq cloud-guest-utils parted gnome-initial-setup
+chroot "$MOUNT_DIR" apt-get install -y -qq cloud-guest-utils parted
+
+# Install first-boot user setup based on desktop choice
+case "$DESKTOP" in
+    kde)
+        echo "Installing plasma-setup for KDE first-boot..."
+        chroot "$MOUNT_DIR" apt-get install -y -qq plasma-setup
+        ;;
+    gnome)
+        echo "Installing gnome-initial-setup for GNOME first-boot..."
+        chroot "$MOUNT_DIR" apt-get install -y -qq gnome-initial-setup
+        ;;
+    *)
+        echo "No first-boot user setup for desktop: $DESKTOP"
+        ;;
+esac
 
 # Clean up
 chroot "$MOUNT_DIR" apt-get autoremove -y -qq
@@ -148,7 +163,7 @@ umount "$MOUNT_DIR/dev"
 # Step 8: Remove live-system artifacts
 echo "[8/15] Removing live-system artifacts..."
 
-# Remove live user if present (disk images should have no users - gnome-initial-setup creates first user)
+# Remove live user if present (gnome-initial-setup creates first user)
 if chroot "$MOUNT_DIR" id sky1 >/dev/null 2>&1; then
     echo "Removing live user 'sky1'..."
     chroot "$MOUNT_DIR" userdel -r sky1 2>/dev/null || true
@@ -167,8 +182,15 @@ rm -rf "$MOUNT_DIR/var/lib/live"
 # Remove live prompt marker (causes "(live)" prefix in terminal)
 rm -f "$MOUNT_DIR/etc/debian_chroot"
 
-# Remove gnome-initial-setup-done marker (live ISO sets this, but disk images need initial-setup)
-rm -f "$MOUNT_DIR/etc/skel/.config/gnome-initial-setup-done"
+# Remove first-boot markers (live ISO sets these, but disk images need initial-setup)
+case "$DESKTOP" in
+    gnome)
+        rm -f "$MOUNT_DIR/etc/skel/.config/gnome-initial-setup-done"
+        ;;
+    kde)
+        rm -f "$MOUNT_DIR/etc/plasma-setup-done"
+        ;;
+esac
 
 # Step 9: Install disk-image-specific overlay files
 echo "[9/15] Installing disk image configuration..."

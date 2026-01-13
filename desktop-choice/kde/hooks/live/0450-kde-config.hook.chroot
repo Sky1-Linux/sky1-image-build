@@ -32,6 +32,8 @@ chmod 700 /etc/NetworkManager/system-connections
 
 # Set SDDM as default display manager
 echo "/usr/bin/sddm" > /etc/X11/default-display-manager
+# Also set systemd symlink (this is what actually determines which DM runs)
+ln -sf /lib/systemd/system/sddm.service /etc/systemd/system/display-manager.service
 
 # Configure SDDM for Wayland session (NO autologin - live overlay adds it)
 mkdir -p /etc/sddm.conf.d

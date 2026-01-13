@@ -1,6 +1,7 @@
 # KDE Plasma Desktop
 task-kde-desktop
 sddm
+plasma-setup
 
 # KDE Applications
 dolphin

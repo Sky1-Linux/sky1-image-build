@@ -204,6 +204,9 @@ generate_ssh_keys
 detect_board_and_cleanup_grub
 apply_preconfig
 
+# Note: User creation is handled by plasma-setup.service which runs after this
+# and before SDDM. plasma-setup provides a graphical wizard for account creation.
+
 # Mark stage 1 complete
 mkdir -p /var/lib/sky1
 touch "$FIRSTBOOT_MARKER"
