@@ -1,0 +1,9 @@
+[Desktops]
+Number=1
+Rows=1
+
+[Tiling]
+padding=4
+
+[Xwayland]
+Scale=1

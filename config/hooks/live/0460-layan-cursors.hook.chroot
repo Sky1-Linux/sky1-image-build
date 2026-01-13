@@ -1,0 +1,22 @@
+#!/bin/sh
+# Install Layan cursor theme from GitHub
+# https://github.com/vinceliuice/Layan-cursors
+
+set -e
+
+echo "Installing Layan cursor theme..."
+
+# Download and extract
+cd /tmp
+wget -q https://github.com/vinceliuice/Layan-cursors/archive/refs/heads/master.tar.gz -O layan-cursors.tar.gz
+tar xzf layan-cursors.tar.gz
+cd Layan-cursors-master
+
+# Install system-wide (runs as root in chroot, so goes to /usr/share/icons)
+./install.sh
+
+# Cleanup
+cd /
+rm -rf /tmp/layan-cursors.tar.gz /tmp/Layan-cursors-master
+
+echo "Layan cursor theme installed."
