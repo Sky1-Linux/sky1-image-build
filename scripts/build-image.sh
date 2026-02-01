@@ -1,11 +1,12 @@
 #!/bin/bash
 # Build Sky1 Linux raw disk image from live-build chroot
 #
-# Usage: sudo ./scripts/build-image.sh <desktop> <loadout>
+# Usage: sudo ./scripts/build-image.sh <desktop> <loadout> [track]
 #
 # Example: sudo ./scripts/build-image.sh gnome desktop
+#          sudo ./scripts/build-image.sh gnome desktop rc
 #
-# Output: sky1-linux-<desktop>-<loadout>-YYYYMMDD.img.xz
+# Output: sky1-linux-<desktop>-<loadout>[-<track>]-YYYYMMDD.img.xz
 #
 # Prerequisites:
 # - Must have a built chroot from lb build (or run build.sh first)
@@ -19,10 +20,21 @@ cd "$BUILD_DIR"
 
 DESKTOP="${1:-gnome}"
 LOADOUT="${2:-desktop}"
+TRACK="${3:-main}"
 IMAGE_SIZE=14              # GB - fits 16GB SD cards, expands on first boot
 DATE=$(date +%Y%m%d)
-IMAGE_NAME="sky1-linux-${DESKTOP}-${LOADOUT}-${DATE}.img"
+
+# Single chroot per desktop — track controls which kernel was installed
 CHROOT_DIR="desktop-choice/${DESKTOP}/chroot"
+
+# Track-aware output naming and kernel glob
+if [ "$TRACK" = "main" ]; then
+    IMAGE_NAME="sky1-linux-${DESKTOP}-${LOADOUT}-${DATE}.img"
+    KERNEL_GLOB="*-sky1"
+else
+    IMAGE_NAME="sky1-linux-${DESKTOP}-${LOADOUT}-${TRACK}-${DATE}.img"
+    KERNEL_GLOB="*-sky1-${TRACK}"
+fi
 
 EFI_SIZE=512               # MB
 ROOT_SIZE=$((IMAGE_SIZE * 1024 - EFI_SIZE))  # MB
@@ -53,6 +65,7 @@ fi
 echo "=== Building Sky1 Linux Disk Image ==="
 echo "Desktop: $DESKTOP"
 echo "Loadout: $LOADOUT"
+echo "Track:   $TRACK"
 echo "Chroot:  $CHROOT_SOURCE"
 echo "Image size: ${IMAGE_SIZE}GB"
 echo "Output: $IMAGE_NAME"
@@ -246,8 +259,8 @@ else
     echo "Warning: Patched GRUB not found at $PATCHED_GRUB"
 fi
 
-# Find kernel version (newest sky1 kernel by version sort)
-KERNEL_VERSION=$(ls "$MOUNT_DIR/boot/vmlinuz-"*-sky1 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+# Find kernel version (newest sky1 kernel matching this track)
+KERNEL_VERSION=$(ls "$MOUNT_DIR/boot/vmlinuz-"${KERNEL_GLOB} 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
 if [ -z "$KERNEL_VERSION" ]; then
     KERNEL_VERSION=$(ls "$MOUNT_DIR/boot/vmlinuz-"* | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
 fi
