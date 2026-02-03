@@ -75,9 +75,10 @@ BOARD_DTB="sky1-orion-o6.dtb"
 if [ -f /sys/firmware/devicetree/base/compatible ]; then
     COMPAT=$(tr '\0' '\n' < /sys/firmware/devicetree/base/compatible | head -1)
     case "$COMPAT" in
-        radxa,orion-o6n*) BOARD_DTB="sky1-orion-o6n.dtb" ;;
-        radxa,orion-o6*)  BOARD_DTB="sky1-orion-o6.dtb" ;;
-        *)                echo "Warning: Unknown board '$COMPAT', using O6 DTB" ;;
+        xunlong,orangepi-6-plus*) BOARD_DTB="sky1-orangepi-6-plus.dtb" ;;
+        radxa,orion-o6n*)         BOARD_DTB="sky1-orion-o6n.dtb" ;;
+        radxa,orion-o6*)          BOARD_DTB="sky1-orion-o6.dtb" ;;
+        *)                        echo "Warning: Unknown board '$COMPAT', using O6 DTB" ;;
     esac
 fi
 

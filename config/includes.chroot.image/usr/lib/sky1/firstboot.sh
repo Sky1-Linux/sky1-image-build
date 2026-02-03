@@ -79,15 +79,17 @@ detect_board_and_cleanup_grub() {
     fi
 
     case "$BOARD_COMPATIBLE" in
+        xunlong,orangepi-6-plus*)
+            BOARD="orangepi-6-plus"
+            KEEP_DTB="sky1-orangepi-6-plus.dtb"
+            ;;
         *orion-o6n*|*radxa,orion-o6n*)
             BOARD="o6n"
             KEEP_DTB="sky1-orion-o6n.dtb"
-            REMOVE_DTB="/sky1-orion-o6.dtb"
             ;;
         *orion-o6*|*radxa,orion-o6*)
             BOARD="o6"
             KEEP_DTB="sky1-orion-o6.dtb"
-            REMOVE_DTB="/sky1-orion-o6n.dtb"
             ;;
         *)
             echo "Unknown board: $BOARD_COMPATIBLE, keeping all GRUB entries"
@@ -96,32 +98,37 @@ detect_board_and_cleanup_grub() {
     esac
 
     echo "Detected board: $BOARD (compatible: $BOARD_COMPATIBLE)"
+    echo "Board DTB: $KEEP_DTB"
 
-    # Update GRUB config to remove entries for other board
+    # Set GRUB default to the detected board's entry (keep all entries for flexibility)
     GRUB_CFG="/boot/efi/GRUB/grub.cfg"
     if [ -f "$GRUB_CFG" ]; then
-        echo "Cleaning up GRUB entries for $BOARD..."
+        echo "Setting GRUB default for $BOARD..."
 
-        # Create backup
-        cp "$GRUB_CFG" "${GRUB_CFG}.bak"
+        # Find the index of the first menuentry containing our DTB
+        local idx=0
+        local found=-1
+        while IFS= read -r line; do
+            if echo "$line" | grep -q "^menuentry"; then
+                if echo "$line" | grep -q "$KEEP_DTB" || \
+                   grep -A5 "^${line}$" "$GRUB_CFG" | grep -q "$KEEP_DTB"; then
+                    found=$idx
+                    break
+                fi
+                idx=$((idx + 1))
+            fi
+        done < "$GRUB_CFG"
 
-        # Remove menuentry blocks that reference the wrong DTB
-        # Using awk for reliable multi-line processing
-        awk -v remove="$REMOVE_DTB" '
-            /^menuentry/ { in_entry=1; entry="" }
-            in_entry { entry = entry $0 "\n" }
-            in_entry && /^}/ {
-                in_entry=0
-                if (index(entry, remove) == 0) {
-                    printf "%s", entry
-                }
-                next
-            }
-            !in_entry { print }
-        ' "$GRUB_CFG" > "${GRUB_CFG}.new"
-
-        mv "${GRUB_CFG}.new" "$GRUB_CFG"
-        echo "GRUB entries for $REMOVE_DTB removed"
+        if [ "$found" -ge 0 ]; then
+            # Update default and set a normal timeout (replaces timeout=-1 from build-image)
+            sed -i "s/^set default=.*/set default=$found/" "$GRUB_CFG"
+            sed -i "s/^set timeout=.*/set timeout=5/" "$GRUB_CFG"
+            echo "GRUB default set to entry $found ($BOARD)"
+        else
+            echo "Warning: Could not find GRUB entry for $KEEP_DTB, setting default=0"
+            sed -i "s/^set default=.*/set default=0/" "$GRUB_CFG"
+            sed -i "s/^set timeout=.*/set timeout=5/" "$GRUB_CFG"
+        fi
     else
         echo "GRUB config not found at $GRUB_CFG"
     fi

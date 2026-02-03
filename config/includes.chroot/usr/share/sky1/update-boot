@@ -28,6 +28,9 @@ detect_board_dtb() {
     compat=$(tr '\0' '\n' < "$COMPAT_FILE" | head -1)
 
     case "$compat" in
+        xunlong,orangepi-6-plus*)
+            echo "sky1-orangepi-6-plus.dtb"
+            ;;
         radxa,orion-o6n*)
             echo "sky1-orion-o6n.dtb"
             ;;

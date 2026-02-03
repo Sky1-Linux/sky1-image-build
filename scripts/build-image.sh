@@ -272,17 +272,15 @@ mkdir -p "$MOUNT_DIR/boot/dtbs"
 DTB_SOURCE="$MOUNT_DIR/usr/lib/linux-image-$KERNEL_VERSION/cix"
 if [ -d "$DTB_SOURCE" ]; then
     echo "Copying DTBs from $DTB_SOURCE..."
-    cp "$DTB_SOURCE/sky1-orion-o6.dtb" "$MOUNT_DIR/boot/dtbs/" 2>/dev/null || true
-    cp "$DTB_SOURCE/sky1-orion-o6n.dtb" "$MOUNT_DIR/boot/dtbs/" 2>/dev/null || true
+    cp "$DTB_SOURCE"/sky1-*.dtb "$MOUNT_DIR/boot/dtbs/" 2>/dev/null || true
 fi
 
 # Verify DTBs exist
-if [ ! -f "$MOUNT_DIR/boot/dtbs/sky1-orion-o6.dtb" ]; then
-    echo "Warning: O6 DTB not found"
-fi
-if [ ! -f "$MOUNT_DIR/boot/dtbs/sky1-orion-o6n.dtb" ]; then
-    echo "Warning: O6N DTB not found"
-fi
+for dtb in sky1-orion-o6 sky1-orion-o6n sky1-orangepi-6-plus; do
+    if [ ! -f "$MOUNT_DIR/boot/dtbs/${dtb}.dtb" ]; then
+        echo "Warning: ${dtb}.dtb not found"
+    fi
+done
 
 # Generate GRUB config with entries for both O6 and O6N
 # Firstboot script will remove the wrong board's entry
@@ -318,6 +316,13 @@ menuentry 'Sky1 Linux ${KERNEL_VERSION} - O6' {
 
 menuentry 'Sky1 Linux ${KERNEL_VERSION} - O6N' {
     devicetree (\$root)/boot/dtbs/sky1-orion-o6n.dtb
+    linux (\$root)/boot/vmlinuz-$KERNEL_VERSION \\
+        $CMDLINE
+    initrd (\$root)/boot/initrd.img-$KERNEL_VERSION
+}
+
+menuentry 'Sky1 Linux ${KERNEL_VERSION} - Orange Pi 6 Plus' {
+    devicetree (\$root)/boot/dtbs/sky1-orangepi-6-plus.dtb
     linux (\$root)/boot/vmlinuz-$KERNEL_VERSION \\
         $CMDLINE
     initrd (\$root)/boot/initrd.img-$KERNEL_VERSION
