@@ -30,10 +30,10 @@ CHROOT_DIR="desktop-choice/${DESKTOP}/chroot"
 # Track-aware output naming and kernel glob
 if [ "$TRACK" = "main" ]; then
     IMAGE_NAME="sky1-linux-${DESKTOP}-${LOADOUT}-${DATE}.img"
-    KERNEL_GLOB="*-sky1"
+    KERNEL_GLOB="*-sky1 *-sky1.r*"
 else
     IMAGE_NAME="sky1-linux-${DESKTOP}-${LOADOUT}-${TRACK}-${DATE}.img"
-    KERNEL_GLOB="*-sky1-${TRACK}"
+    KERNEL_GLOB="*-sky1-${TRACK} *-sky1-${TRACK}.r*"
 fi
 
 EFI_SIZE=512               # MB
@@ -260,7 +260,14 @@ else
 fi
 
 # Find kernel version (newest sky1 kernel matching this track)
-KERNEL_VERSION=$(ls "$MOUNT_DIR/boot/vmlinuz-"${KERNEL_GLOB} 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+# KERNEL_GLOB may contain multiple patterns (space-separated)
+KERNEL_VERSION=""
+for pattern in $KERNEL_GLOB; do
+    match=$(ls "$MOUNT_DIR/boot/vmlinuz-"${pattern} 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+    if [ -n "$match" ]; then
+        KERNEL_VERSION="$match"
+    fi
+done
 if [ -z "$KERNEL_VERSION" ]; then
     KERNEL_VERSION=$(ls "$MOUNT_DIR/boot/vmlinuz-"* | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
 fi

@@ -37,10 +37,10 @@ CHROOT_DIR="desktop-choice/${DESKTOP}/chroot"
 # Meta packages for requested track
 if [ "$TRACK" = "main" ]; then
     INSTALL_META="linux-image-sky1 linux-headers-sky1"
-    KERNEL_GLOB="*-sky1"
+    KERNEL_GLOB="*-sky1 *-sky1.r*"
 else
     INSTALL_META="linux-image-sky1-${TRACK} linux-headers-sky1-${TRACK}"
-    KERNEL_GLOB="*-sky1-${TRACK}"
+    KERNEL_GLOB="*-sky1-${TRACK} *-sky1-${TRACK}.r*"
 fi
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -196,7 +196,15 @@ chroot "$CHROOT_DIR" apt-get clean
 chroot "$CHROOT_DIR" update-initramfs -u -k all
 
 # Step 7: Show result
-KERNEL=$(ls "$CHROOT_DIR/boot/vmlinuz-"${KERNEL_GLOB} 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+# KERNEL_GLOB may contain multiple patterns (space-separated) to match both
+# old-style (vmlinuz-*-sky1-rc) and new-style (vmlinuz-*-sky1-rc.rN)
+KERNEL=""
+for pattern in $KERNEL_GLOB; do
+    match=$(ls "$CHROOT_DIR/boot/vmlinuz-"${pattern} 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+    if [ -n "$match" ]; then
+        KERNEL="$match"
+    fi
+done
 if [ -z "$KERNEL" ]; then
     KERNEL=$(ls "$CHROOT_DIR/boot/vmlinuz-"* 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
 fi
