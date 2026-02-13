@@ -4,12 +4,14 @@
 # Usage: sudo ./scripts/update-chroot.sh <desktop> [track] [expected-version]
 #
 # Example: sudo ./scripts/update-chroot.sh gnome
-#          sudo ./scripts/update-chroot.sh gnome main 6.18.8
-#          sudo ./scripts/update-chroot.sh gnome rc 6.19.0-rc7
-#          sudo ./scripts/update-chroot.sh kde latest 6.19.1
+#          sudo ./scripts/update-chroot.sh gnome main 6.18.8-1
+#          sudo ./scripts/update-chroot.sh gnome rc 6.19.0-rc7-1
+#          sudo ./scripts/update-chroot.sh kde latest 6.19.1-1
 #
 # When expected-version is given, the script waits for the apt repository
 # to serve that version before upgrading (handles CDN propagation delay).
+# The version must match the APT candidate exactly, including the Debian
+# revision suffix (e.g. "6.18.10-2", not "6.18.10").
 #
 # This updates an existing chroot's packages (kernel, firmware, etc.)
 # without rebuilding from scratch. Use after uploading new packages to apt.

@@ -142,6 +142,10 @@ rsync -aHAXq --numeric-ids \
     --exclude='/var/lib/apt/lists/*' \
     "$CHROOT_SOURCE/" "$MOUNT_DIR/"
 
+# Ensure root directory is owned by root (chroot dir may inherit host user ownership)
+chown root:root "$MOUNT_DIR"
+chown root:root "$MOUNT_DIR/boot"
+
 # Step 7: Remove live-boot packages, add disk image specific
 echo "[7/15] Configuring for installed system..."
 
