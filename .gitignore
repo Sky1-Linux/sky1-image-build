@@ -18,13 +18,20 @@ source/
 # Desktop-specific chroots
 desktop-choice/*/chroot/
 
-# Generated config
+# Generated config (live-build)
 config/binary
 config/bootstrap
 config/build
 config/chroot
 config/common
 config/source
+
+# Derived config (overwritten by build.sh from desktop-choice/loadout-choice)
+config/archives/sky1.list.chroot
+config/package-lists/sky1.list.chroot
+config/package-lists/desktop.list.chroot
+config/package-lists/loadout.list.chroot
+config/hooks/live/0450-desktop-config.hook.chroot
 
 # Additional build artifacts
 binary.modified_timestamps

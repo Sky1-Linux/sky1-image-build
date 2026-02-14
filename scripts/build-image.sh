@@ -121,7 +121,7 @@ echo "Root partition: $ROOT_PART"
 # Step 4: Format partitions
 echo "[4/15] Formatting partitions..."
 mkfs.vfat -F 32 -n SKY1EFI "$EFI_PART"
-mkfs.ext4 -O ^metadata_csum -L sky1root -q "$ROOT_PART"
+mkfs.ext4 -O ^metadata_csum,^orphan_file -L sky1root -q "$ROOT_PART"
 
 # Step 5: Mount partitions
 echo "[5/15] Mounting partitions..."
@@ -181,6 +181,10 @@ case "$DESKTOP" in
         ;;
 esac
 
+# Ensure system users from sysusers.d are created
+chroot "$MOUNT_DIR" systemd-sysusers 2>/dev/null || true
+
+
 # Clean up
 chroot "$MOUNT_DIR" apt-get autoremove -y -qq
 chroot "$MOUNT_DIR" apt-get clean
@@ -225,7 +229,9 @@ esac
 # Step 9: Install disk-image-specific overlay files
 echo "[9/15] Installing disk image configuration..."
 if [ -d "config/includes.chroot.image" ]; then
-    cp -a config/includes.chroot.image/* "$MOUNT_DIR/"
+    # Use rsync --no-o --no-g to copy files without changing ownership of
+    # existing parent directories (cp -a would overwrite /etc ownership)
+    rsync -rptl --no-o --no-g config/includes.chroot.image/ "$MOUNT_DIR/"
 fi
 
 # Update dconf database after overlay (recompile with image-specific settings)
@@ -344,7 +350,9 @@ EOF
 echo "[12/16] Clearing machine-id for first-boot generation..."
 rm -f "$MOUNT_DIR/etc/machine-id"
 rm -f "$MOUNT_DIR/var/lib/dbus/machine-id"
-touch "$MOUNT_DIR/etc/machine-id"  # Empty file signals regeneration needed
+# Leave machine-id MISSING (not empty). In systemd >= 253:
+#   missing file  → first boot (ConditionFirstBoot=yes triggers)
+#   empty file    → machine-id regenerated but NOT first boot
 
 # Step 13: Clear SSH host keys
 echo "[13/16] Clearing SSH host keys..."

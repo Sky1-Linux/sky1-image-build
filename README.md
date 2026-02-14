@@ -24,27 +24,31 @@ sudo ./scripts/build.sh gnome desktop image
 ## Build Options
 
 ```
-./scripts/build.sh <desktop> <loadout> <format> [clean]
+./scripts/build.sh <desktop> <loadout> <format> [track] [clean]
 
 Desktop:  gnome | kde | xfce | none
 Loadout:  minimal | desktop | server | developer
 Format:   iso | image
+Track:    main | latest | rc | next  (default: main)
 ```
 
 ### Examples
 
 ```bash
-# GNOME with full desktop apps
+# GNOME with full desktop apps (LTS kernel)
 ./scripts/build.sh gnome desktop iso
 
-# KDE minimal (no extra apps)
-./scripts/build.sh kde minimal iso
+# KDE desktop disk image (latest kernel)
+sudo ./scripts/build.sh kde desktop image latest
 
-# XFCE developer workstation
-./scripts/build.sh xfce developer iso
+# XFCE developer workstation (RC kernel)
+./scripts/build.sh xfce developer iso rc
 
 # Headless server disk image
 sudo ./scripts/build.sh none server image
+
+# Clean rebuild from scratch
+sudo ./scripts/build.sh gnome desktop image main clean
 ```
 
 ## Output Files
@@ -99,8 +103,9 @@ sky1-image-build/
 Each desktop environment has its own isolated chroot under `desktop-choice/<desktop>/chroot/`.
 This prevents cross-contamination of packages and configurations between desktop environments.
 
-- First build for a desktop creates its chroot via `lb build`
+- First build creates the chroot via `lb bootstrap` + `lb chroot` (no ISO side effect)
 - Subsequent builds reuse the existing desktop-specific chroot
+- ISO generation (`lb binary`) only runs when `format=iso`
 - Use `clean` to force a fresh chroot: `./scripts/build.sh gnome desktop iso clean`
 - The top-level `chroot` symlink points to the active desktop's chroot for live-build compatibility
 

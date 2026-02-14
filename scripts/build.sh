@@ -286,14 +286,32 @@ finalize_chroot() {
     fi
 }
 
-# Build based on format
-if [ "$FORMAT" = "iso" ]; then
+# Prepare chroot if it doesn't exist.
+# Run lb bootstrap + lb chroot to create the chroot without generating an ISO.
+# This is shared by both iso and image builds.
+if [ ! -d "$CHROOT_DIR" ] && [ ! -d "chroot" ]; then
     echo ""
-    echo "Building ISO with live-build..."
-    sudo lb build 2>&1 | tee build.log
+    echo "No chroot found for $DESKTOP. Building chroot..."
+    sudo lb bootstrap 2>&1 | tee build.log
+    sudo lb chroot 2>&1 | tee -a build.log
 
     # Finalize chroot naming
     finalize_chroot
+fi
+
+# Ensure symlink is correct
+if [ -d "$CHROOT_DIR" ] && [ ! -L "chroot" ]; then
+    ln -sf "$CHROOT_DIR" chroot
+fi
+
+# Ensure chroot has the right kernel for the requested track
+ensure_chroot_track "$CHROOT_DIR"
+
+# Build based on format
+if [ "$FORMAT" = "iso" ]; then
+    echo ""
+    echo "Building ISO from chroot..."
+    sudo lb binary 2>&1 | tee -a build.log
 
     # Find and rename output
     ISO_FILE=$(ls sky1-linux-*.iso 2>/dev/null | grep -v "$OUTPUT_NAME" | head -1)
@@ -309,24 +327,6 @@ if [ "$FORMAT" = "iso" ]; then
     fi
 
 elif [ "$FORMAT" = "image" ]; then
-    # For disk images, we need a chroot first
-    if [ ! -d "$CHROOT_DIR" ] && [ ! -d "chroot" ]; then
-        echo ""
-        echo "No chroot found for $DESKTOP. Building chroot first..."
-        sudo lb build 2>&1 | tee build.log
-
-        # Finalize chroot naming
-        finalize_chroot
-    fi
-
-    # Ensure symlink is correct
-    if [ -d "$CHROOT_DIR" ] && [ ! -L "chroot" ]; then
-        ln -sf "$CHROOT_DIR" chroot
-    fi
-
-    # Ensure chroot has the right kernel for the requested track
-    ensure_chroot_track "$CHROOT_DIR"
-
     echo ""
     echo "Building disk image..."
     sudo ./scripts/build-image.sh "$DESKTOP" "$LOADOUT" "$TRACK"

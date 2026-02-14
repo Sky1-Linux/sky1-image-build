@@ -43,6 +43,7 @@ DisplayServer=wayland
 GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 
 [Wayland]
+CompositorCommand=kwin_wayland --no-lockscreen --inputmethod maliit-keyboard
 SessionDir=/usr/share/wayland-sessions
 EOF
 
