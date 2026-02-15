@@ -1,0 +1,565 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# ///
+"""sky1-provision — Pre-configure a Sky1 Linux image before first boot.
+
+Writes /boot/efi/sky1-config.txt to the EFI partition of a flashed Sky1 Linux
+image. On first boot, sky1-firstboot.service reads and applies the
+configuration, then securely deletes the file.
+
+Target can be:
+  /dev/sdX         Block device (finds EFI partition automatically)
+  image.img        Image file (loop-mounts, finds EFI partition)
+  --efi /path      Already-mounted EFI partition
+
+With no options besides the target, runs interactively.
+"""
+
+import argparse
+import getpass
+import hashlib
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import dataclass, fields
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+# Ensure sbin dirs are in PATH (needed when run via sudo with user PATH)
+for _sbin in ("/sbin", "/usr/sbin"):
+    if _sbin not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = os.environ.get("PATH", "") + ":" + _sbin
+
+
+@dataclass
+class ProvisionConfig:
+    hostname: str = ""
+    username: str = ""
+    password_hash: str = ""
+    ssh_authorized_keys: str = ""
+    ssh_enabled: str = ""
+    ssh_password_auth: str = ""
+    wifi_ssid: str = ""
+    wifi_psk: str = ""
+    wifi_country: str = ""
+    timezone: str = ""
+    locale: str = ""
+    keymap: str = ""
+
+    def has_any(self) -> bool:
+        return any(getattr(self, f.name) for f in fields(self))
+
+
+# --- Password Hashing ---
+
+# SHA-512 crypt ($6$) — same format as /etc/shadow
+# Uses the standard Unix crypt algorithm, not raw SHA-512
+
+# The SHA-512 crypt rounds and encoding tables per the specification
+_CRYPT_B64 = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def _sha512_crypt(password: str, salt: str, rounds: int = 5000) -> str:
+    """Compute SHA-512 crypt hash ($6$) per the Unix crypt specification.
+
+    This implements the sha512crypt algorithm used by glibc's crypt(3),
+    producing hashes compatible with /etc/shadow.
+    """
+    pwd = password.encode("utf-8")
+    slt = salt.encode("utf-8")
+
+    # Step 1-3: Digest B
+    b = hashlib.sha512(pwd + slt + pwd).digest()
+
+    # Step 4-8: Digest A
+    a_ctx = hashlib.sha512(pwd + slt)
+    # Step 9-10: Add bytes from B
+    for i in range(len(pwd) // 64):
+        a_ctx.update(b)
+    a_ctx.update(b[: len(pwd) % 64])
+    # Step 11: Process password length bits
+    n = len(pwd)
+    while n > 0:
+        if n & 1:
+            a_ctx.update(b)
+        else:
+            a_ctx.update(pwd)
+        n >>= 1
+    a = a_ctx.digest()
+
+    # Step 12: Digest DP (password hash for P)
+    dp_ctx = hashlib.sha512()
+    for _ in range(len(pwd)):
+        dp_ctx.update(pwd)
+    dp = dp_ctx.digest()
+    p = (dp * (len(pwd) // 64 + 1))[: len(pwd)]
+
+    # Step 13: Digest DS (salt hash for S)
+    ds_ctx = hashlib.sha512()
+    for _ in range(16 + a[0]):
+        ds_ctx.update(slt)
+    ds = ds_ctx.digest()
+    s = (ds * (len(slt) // 64 + 1))[: len(slt)]
+
+    # Step 14: Rounds
+    c = a
+    for i in range(rounds):
+        ctx = hashlib.sha512()
+        if i & 1:
+            ctx.update(p)
+        else:
+            ctx.update(c)
+        if i % 3:
+            ctx.update(s)
+        if i % 7:
+            ctx.update(p)
+        if i & 1:
+            ctx.update(c)
+        else:
+            ctx.update(p)
+        c = ctx.digest()
+
+    # Step 15: Encode to base64
+    def b64_from_24bit(b2, b1, b0, n):
+        w = (b2 << 16) | (b1 << 8) | b0
+        out = ""
+        for _ in range(n):
+            out += _CRYPT_B64[w & 0x3F]
+            w >>= 6
+        return out
+
+    encoded = (
+        b64_from_24bit(c[0], c[21], c[42], 4)
+        + b64_from_24bit(c[22], c[43], c[1], 4)
+        + b64_from_24bit(c[44], c[2], c[23], 4)
+        + b64_from_24bit(c[3], c[24], c[45], 4)
+        + b64_from_24bit(c[25], c[46], c[4], 4)
+        + b64_from_24bit(c[47], c[5], c[26], 4)
+        + b64_from_24bit(c[6], c[27], c[48], 4)
+        + b64_from_24bit(c[28], c[49], c[7], 4)
+        + b64_from_24bit(c[50], c[8], c[29], 4)
+        + b64_from_24bit(c[9], c[30], c[51], 4)
+        + b64_from_24bit(c[31], c[52], c[10], 4)
+        + b64_from_24bit(c[53], c[11], c[32], 4)
+        + b64_from_24bit(c[12], c[33], c[54], 4)
+        + b64_from_24bit(c[34], c[55], c[13], 4)
+        + b64_from_24bit(c[56], c[14], c[35], 4)
+        + b64_from_24bit(c[15], c[36], c[57], 4)
+        + b64_from_24bit(c[37], c[58], c[16], 4)
+        + b64_from_24bit(c[59], c[17], c[38], 4)
+        + b64_from_24bit(c[18], c[39], c[60], 4)
+        + b64_from_24bit(c[40], c[61], c[19], 4)
+        + b64_from_24bit(c[62], c[20], c[41], 4)
+        + b64_from_24bit(0, 0, c[63], 2)
+    )
+
+    prefix = "$6$"
+    if rounds != 5000:
+        prefix = f"$6$rounds={rounds}$"
+    return f"{prefix}{salt}${encoded}"
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-512 crypt ($6$), compatible with /etc/shadow."""
+    salt_bytes = os.urandom(12)
+    salt = ""
+    for b in salt_bytes:
+        salt += _CRYPT_B64[b % 64]
+    return _sha512_crypt(password, salt)
+
+
+def wifi_psk(ssid: str, password: str) -> str:
+    """Compute WPA-PSK from SSID and password (PBKDF2-SHA1, 4096 rounds)."""
+    return hashlib.pbkdf2_hmac(
+        "sha1", password.encode("utf-8"), ssid.encode("utf-8"), 4096, 32
+    ).hex()
+
+
+# --- EFI Partition Mounting ---
+
+
+class MountContext:
+    """Manages loop device and mount lifecycle with cleanup."""
+
+    def __init__(self):
+        self.efi_mount: Optional[str] = None
+        self.loop_dev: Optional[str] = None
+        self._cleanup_mount = False
+        self._cleanup_loop = False
+
+    def cleanup(self):
+        if self._cleanup_mount and self.efi_mount:
+            subprocess.run(["umount", self.efi_mount], capture_output=True)
+            try:
+                os.rmdir(self.efi_mount)
+            except OSError:
+                pass
+        if self._cleanup_loop and self.loop_dev:
+            subprocess.run(["losetup", "-d", self.loop_dev], capture_output=True)
+
+    def mount_efi_from_device(self, dev: str):
+        """Find and mount the EFI (first) partition from a block device."""
+        # Find partition naming scheme
+        efi_part = None
+        for suffix in ["1", "p1"]:
+            candidate = dev + suffix
+            if Path(candidate).exists() and os.stat(candidate).st_mode & 0o170000 == 0o060000:
+                efi_part = candidate
+                break
+        if not efi_part:
+            die(f"Cannot find first partition on {dev}")
+
+        # Verify FAT filesystem
+        result = subprocess.run(
+            ["blkid", "-s", "TYPE", "-o", "value", efi_part],
+            capture_output=True, text=True,
+        )
+        fstype = result.stdout.strip()
+        if fstype != "vfat":
+            die(f"First partition ({efi_part}) is not FAT32 (got: {fstype or 'unknown'})")
+
+        self.efi_mount = tempfile.mkdtemp(prefix="sky1-efi.")
+        result = subprocess.run(["mount", efi_part, self.efi_mount])
+        if result.returncode != 0:
+            os.rmdir(self.efi_mount)
+            die(f"Failed to mount {efi_part}")
+        self._cleanup_mount = True
+        print(f"Mounted EFI partition: {efi_part} \u2192 {self.efi_mount}")
+
+    def setup_loop_device(self, img: str):
+        """Set up a loop device for an image file and mount its EFI partition."""
+        if not Path(img).is_file():
+            die(f"Image file not found: {img}")
+
+        result = subprocess.run(
+            ["losetup", "--find", "--show", "--partscan", img],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            die(f"Failed to set up loop device for {img}")
+        self.loop_dev = result.stdout.strip()
+        self._cleanup_loop = True
+        print(f"Loop device: {self.loop_dev}")
+
+        # Wait for partition devices
+        time.sleep(1)
+        subprocess.run(["partprobe", self.loop_dev], capture_output=True)
+        time.sleep(1)
+
+        self.mount_efi_from_device(self.loop_dev)
+
+
+# --- Interactive Mode ---
+
+
+def prompt(text: str, default: str = "") -> str:
+    """Prompt user for input with optional default."""
+    if default:
+        value = input(f"{text} [{default}]: ").strip()
+        return value or default
+    return input(f"{text}: ").strip()
+
+
+def prompt_password(text: str) -> str:
+    """Prompt for a password with confirmation."""
+    while True:
+        p1 = getpass.getpass(f"{text}: ")
+        if not p1:
+            return ""
+        p2 = getpass.getpass("Confirm: ")
+        if p1 == p2:
+            return p1
+        print("Passwords don't match, try again.")
+
+
+def run_interactive(cfg: ProvisionConfig):
+    """Interactively prompt for all provisioning settings."""
+    print()
+    print("=== Sky1 Linux Image Provisioning ===")
+    print("Press Enter to skip any setting.")
+    print()
+
+    cfg.hostname = prompt("Hostname", "sky1")
+    print()
+
+    cfg.username = prompt("Username")
+    if cfg.username:
+        raw_password = prompt_password("Password (leave empty for key-only auth)")
+        if raw_password:
+            cfg.password_hash = hash_password(raw_password)
+    print()
+
+    ssh_input = prompt("SSH key file or paste key (empty to skip)")
+    if ssh_input:
+        expanded = os.path.expanduser(ssh_input)
+        if Path(expanded).is_file():
+            keys = Path(expanded).read_text().strip().splitlines()
+        elif ssh_input.startswith("ssh-"):
+            # Direct key paste — collect additional keys
+            keys = [ssh_input]
+            while True:
+                extra = input("Additional SSH key (empty to finish): ").strip()
+                if not extra:
+                    break
+                keys.append(extra)
+        else:
+            die(f"Not a valid key file or SSH key: {ssh_input}")
+        cfg.ssh_authorized_keys = "\\n".join(keys)
+        cfg.ssh_enabled = "yes"
+        cfg.ssh_password_auth = prompt("Allow SSH password login?", "yes")
+    print()
+
+    cfg.wifi_ssid = prompt("WiFi network name (SSID)")
+    if cfg.wifi_ssid:
+        wifi_pass = prompt_password("WiFi password")
+        if wifi_pass:
+            cfg.wifi_psk = wifi_psk(cfg.wifi_ssid, wifi_pass)
+        cfg.wifi_country = prompt("WiFi country code", "AU")
+    print()
+
+    cfg.timezone = prompt("Timezone", "Australia/Sydney")
+    cfg.locale = prompt("Locale", "en_AU.UTF-8")
+    cfg.keymap = prompt("Keyboard layout", "us")
+
+
+# --- Config Writing ---
+
+# Map dataclass field names to config file key names
+_FIELD_TO_KEY = {
+    "hostname": "HOSTNAME",
+    "username": "USERNAME",
+    "password_hash": "PASSWORD_HASH",
+    "ssh_authorized_keys": "SSH_AUTHORIZED_KEYS",
+    "ssh_enabled": "SSH_ENABLED",
+    "ssh_password_auth": "SSH_PASSWORD_AUTH",
+    "wifi_ssid": "WIFI_SSID",
+    "wifi_psk": "WIFI_PSK",
+    "wifi_country": "WIFI_COUNTRY",
+    "timezone": "TIMEZONE",
+    "locale": "LOCALE",
+    "keymap": "KEYMAP",
+}
+
+_REDACTED_KEYS = {"PASSWORD_HASH", "WIFI_PSK"}
+
+
+def write_config(efi_mount: str, cfg: ProvisionConfig):
+    """Write sky1-config.txt to the EFI partition."""
+    config_path = Path(efi_mount) / "sky1-config.txt"
+
+    print("Writing provisioning config...")
+
+    lines = [
+        "# Sky1 Linux provisioning config",
+        f"# Generated by sky1-provision on {datetime.now(timezone.utc).isoformat()}",
+        "# This file is read and deleted on first boot.",
+        "",
+    ]
+
+    for field in fields(cfg):
+        value = getattr(cfg, field.name)
+        if value:
+            key = _FIELD_TO_KEY[field.name]
+            lines.append(f"{key}={value}")
+
+    config_path.write_text("\n".join(lines) + "\n")
+    config_path.chmod(0o600)
+    subprocess.run(["sync"])
+
+    print()
+    print(f"Config written to: {config_path}")
+    print("--- Contents (secrets redacted) ---")
+    for line in lines:
+        if line and not line.startswith("#"):
+            key_part = line.split("=", 1)[0]
+            if key_part in _REDACTED_KEYS:
+                print(f"{key_part}=***")
+                continue
+        print(line)
+    print("---")
+
+
+# --- Helpers ---
+
+
+def die(msg: str):
+    print(f"sky1-provision: error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def warn(msg: str):
+    print(f"sky1-provision: warning: {msg}", file=sys.stderr)
+
+
+# --- Main ---
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="sky1-provision",
+        description="Pre-configure a Sky1 Linux image before first boot.",
+        epilog="""\
+examples:
+  # Interactive
+  sudo sky1-provision /dev/sda
+
+  # Headless server with SSH key
+  sudo sky1-provision /dev/sda \\
+    --hostname my-server \\
+    --user admin \\
+    --password-hash "$(openssl passwd -6)" \\
+    --ssh-key ~/.ssh/id_ed25519.pub \\
+    --ssh-password-auth no \\
+    --timezone Australia/Sydney
+
+security:
+  Passwords are hashed with SHA-512 crypt before writing.
+  WiFi passwords are converted to WPA-PSK (256-bit hex key).
+  The config file is shredded on first boot.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        "target", nargs="?", default=None,
+        help="Block device (/dev/sdX), image file, or omit if using --efi",
+    )
+    parser.add_argument(
+        "--efi", metavar="PATH",
+        help="Already-mounted EFI partition path",
+    )
+    parser.add_argument("--hostname", metavar="NAME", help="Set system hostname")
+    parser.add_argument("--user", metavar="NAME", dest="username", help="Create user with sudo access")
+    parser.add_argument(
+        "--password-hash", metavar="HASH", dest="password_hash",
+        help="Set user password hash (from: openssl passwd -6)",
+    )
+    parser.add_argument("--password", metavar="PASS", help="Set user password (will be hashed)")
+    parser.add_argument(
+        "--ssh-key", metavar="FILE", dest="ssh_key",
+        help="Install SSH public key (path to .pub file)",
+    )
+    parser.add_argument(
+        "--ssh-enabled", choices=["yes", "no"], dest="ssh_enabled",
+        help="Enable/disable SSH server (default: yes if key set)",
+    )
+    parser.add_argument(
+        "--ssh-password-auth", choices=["yes", "no"], dest="ssh_password_auth",
+        help="Allow SSH password login (default: yes)",
+    )
+    parser.add_argument("--wifi-ssid", metavar="SSID", dest="wifi_ssid", help="Configure WiFi network")
+    parser.add_argument(
+        "--wifi-password", metavar="PASS", dest="wifi_password",
+        help="WiFi password (converted to PSK before writing)",
+    )
+    parser.add_argument(
+        "--wifi-country", metavar="CC", dest="wifi_country",
+        help="WiFi regulatory domain (e.g., AU, US, GB)",
+    )
+    parser.add_argument("--timezone", metavar="TZ", help="Set timezone (e.g., Australia/Sydney)")
+    parser.add_argument("--locale", metavar="LOCALE", help="Set system locale (e.g., en_AU.UTF-8)")
+    parser.add_argument("--keymap", metavar="MAP", help="Set keyboard layout (e.g., us)")
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+
+    # Determine if running interactively (no config options given)
+    config_opts = [
+        "hostname", "username", "password_hash", "password", "ssh_key",
+        "ssh_enabled", "ssh_password_auth", "wifi_ssid", "wifi_password",
+        "wifi_country", "timezone", "locale", "keymap",
+    ]
+    interactive = not any(getattr(args, opt) for opt in config_opts)
+
+    # Must have a target or --efi
+    if not args.target and not args.efi:
+        parser.print_help()
+        sys.exit(1)
+
+    # Must be root for mounting
+    if os.getuid() != 0:
+        die("Must be run as root (for mounting partitions)")
+
+    # Mount EFI partition
+    mctx = MountContext()
+    try:
+        if args.efi:
+            if not Path(args.efi).is_dir():
+                die(f"EFI mount point not found: {args.efi}")
+            mctx.efi_mount = args.efi
+            print(f"Using EFI partition at: {args.efi}")
+        elif args.target:
+            target = Path(args.target)
+            if target.is_block_device():
+                mctx.mount_efi_from_device(args.target)
+            elif target.is_file():
+                mctx.setup_loop_device(args.target)
+            else:
+                die(f"Target is not a block device or file: {args.target}")
+        else:
+            die("No target specified. Use a block device, image file, or --efi.")
+
+        # Verify it looks like a Sky1 EFI partition
+        efi = Path(mctx.efi_mount)
+        if not (efi / "EFI").is_dir() and not (efi / "GRUB").is_dir():
+            warn("EFI partition doesn't look like a Sky1 Linux image (no EFI/ or GRUB/ directory)")
+
+        # Build config
+        cfg = ProvisionConfig()
+
+        if interactive:
+            run_interactive(cfg)
+        else:
+            # Populate from CLI args
+            if args.hostname:
+                cfg.hostname = args.hostname
+            if args.username:
+                cfg.username = args.username
+            if args.password_hash:
+                cfg.password_hash = args.password_hash
+            elif args.password:
+                cfg.password_hash = hash_password(args.password)
+            if args.ssh_key:
+                key_path = Path(os.path.expanduser(args.ssh_key))
+                if not key_path.is_file():
+                    die(f"SSH key file not found: {args.ssh_key}")
+                keys = key_path.read_text().strip().splitlines()
+                cfg.ssh_authorized_keys = "\\n".join(keys)
+            if args.ssh_enabled:
+                cfg.ssh_enabled = args.ssh_enabled
+            if args.ssh_password_auth:
+                cfg.ssh_password_auth = args.ssh_password_auth
+            if args.wifi_ssid:
+                cfg.wifi_ssid = args.wifi_ssid
+            if args.wifi_password and args.wifi_ssid:
+                cfg.wifi_psk = wifi_psk(args.wifi_ssid, args.wifi_password)
+            if args.wifi_country:
+                cfg.wifi_country = args.wifi_country
+            if args.timezone:
+                cfg.timezone = args.timezone
+            if args.locale:
+                cfg.locale = args.locale
+            if args.keymap:
+                cfg.keymap = args.keymap
+
+            # Auto-enable SSH when a key is provided
+            if cfg.ssh_authorized_keys and not cfg.ssh_enabled:
+                cfg.ssh_enabled = "yes"
+
+        write_config(mctx.efi_mount, cfg)
+        print()
+        print("Provisioning complete. The image will apply these settings on first boot.")
+
+    finally:
+        mctx.cleanup()
+
+
+if __name__ == "__main__":
+    main()

@@ -7,7 +7,13 @@
 # - Machine-id generation
 # - SSH host key generation
 # - Board detection and GRUB cleanup
-# - Optional pre-configuration from EFI partition
+# - Pre-configuration from /boot/efi/sky1-config.txt:
+#   HOSTNAME, USERNAME, PASSWORD[_HASH], SSH_AUTHORIZED_KEYS,
+#   SSH_ENABLED, SSH_PASSWORD_AUTH, WIFI_SSID, WIFI_PSK or WIFI_PASSWORD,
+#   WIFI_COUNTRY, TIMEZONE, LOCALE, KEYMAP
+#
+# Security: Use PASSWORD_HASH and WIFI_PSK to avoid storing plaintext
+# secrets on the EFI partition. The config file is shredded after use.
 
 set -e
 
@@ -134,6 +140,25 @@ detect_board_and_cleanup_grub() {
     fi
 }
 
+# Parse sky1-config.txt into shell variables
+# Handles KEY=VALUE, KEY="VALUE", and values containing '='
+parse_config() {
+    local file="$1"
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        # Split on first '=' only
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        key="${key// }"
+        # Remove surrounding quotes
+        value="${value#\"}" ; value="${value%\"}"
+        value="${value#\'}" ; value="${value%\'}"
+        export "$key=$value"
+    done < "$file"
+}
+
 # Apply pre-configuration from EFI partition (if present)
 apply_preconfig() {
     if [ ! -f "$FIRSTBOOT_CONFIG" ]; then
@@ -142,58 +167,146 @@ apply_preconfig() {
     fi
 
     echo "Applying pre-configuration from $FIRSTBOOT_CONFIG..."
+    parse_config "$FIRSTBOOT_CONFIG"
 
-    # Source the config file safely
-    while IFS='=' read -r key value; do
-        # Skip comments and empty lines
-        [[ "$key" =~ ^#.*$ ]] && continue
-        [[ -z "$key" ]] && continue
-        # Remove quotes from value
-        value="${value%\"}"
-        value="${value#\"}"
-        value="${value%\'}"
-        value="${value#\'}"
-        export "$key=$value"
-    done < "$FIRSTBOOT_CONFIG"
-
-    # Set hostname if provided
+    # --- Hostname ---
     if [ -n "$HOSTNAME" ]; then
         echo "Setting hostname to: $HOSTNAME"
         hostnamectl set-hostname "$HOSTNAME"
         echo "$HOSTNAME" > /etc/hostname
-        sed -i "s/Sky1-Desktop/$HOSTNAME/g" /etc/hosts 2>/dev/null || true
+        if grep -q "^127\.0\.1\.1" /etc/hosts 2>/dev/null; then
+            sed -i "s/127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
+        else
+            echo "127.0.1.1	$HOSTNAME" >> /etc/hosts
+        fi
     fi
 
-    # Create user if provided (skip wizard later)
+    # --- Timezone ---
+    if [ -n "$TIMEZONE" ]; then
+        echo "Setting timezone to: $TIMEZONE"
+        timedatectl set-timezone "$TIMEZONE" 2>/dev/null || \
+            ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+    fi
+
+    # --- Locale ---
+    if [ -n "$LOCALE" ]; then
+        echo "Setting locale to: $LOCALE"
+        sed -i "s/^# *${LOCALE}/${LOCALE}/" /etc/locale.gen 2>/dev/null || true
+        locale-gen 2>/dev/null || true
+        localectl set-locale "LANG=$LOCALE" 2>/dev/null || \
+            echo "LANG=$LOCALE" > /etc/default/locale
+    fi
+
+    # --- Keymap ---
+    if [ -n "$KEYMAP" ]; then
+        echo "Setting keymap to: $KEYMAP"
+        localectl set-keymap "$KEYMAP" 2>/dev/null || true
+    fi
+
+    # --- User creation ---
     if [ -n "$USERNAME" ]; then
         echo "Creating user: $USERNAME"
         useradd -m -G users,sudo,audio,video,netdev,plugdev,input,render \
                 -s /bin/bash "$USERNAME" 2>/dev/null || true
 
         if [ -n "$PASSWORD_HASH" ]; then
-            echo "$USERNAME:$PASSWORD_HASH" | chpasswd -e
+            usermod -p "$PASSWORD_HASH" "$USERNAME"
         elif [ -n "$PASSWORD" ]; then
             echo "$USERNAME:$PASSWORD" | chpasswd
         fi
 
-        # Update autologin to new user
+        # Install SSH authorized keys
+        if [ -n "$SSH_AUTHORIZED_KEYS" ]; then
+            local user_home
+            user_home=$(getent passwd "$USERNAME" | cut -d: -f6)
+            if [ -n "$user_home" ]; then
+                echo "Installing SSH authorized keys for $USERNAME"
+                mkdir -p "$user_home/.ssh"
+                # Decode escaped newlines and append
+                printf '%b\n' "$SSH_AUTHORIZED_KEYS" > "$user_home/.ssh/authorized_keys"
+                chmod 700 "$user_home/.ssh"
+                chmod 600 "$user_home/.ssh/authorized_keys"
+                chown -R "$USERNAME:$USERNAME" "$user_home/.ssh"
+            fi
+        fi
+
+        # Update autologin to new user (desktop images)
         if [ -f /etc/gdm3/custom.conf ]; then
             sed -i "s/AutomaticLogin=sky1/AutomaticLogin=$USERNAME/" /etc/gdm3/custom.conf
         fi
         if [ -f /etc/sddm.conf.d/10-wayland.conf ]; then
             sed -i "s/User=sky1/User=$USERNAME/" /etc/sddm.conf.d/10-wayland.conf
         fi
-        if [ -f /etc/lightdm/lightdm.conf.d/50-autologin.conf ]; then
-            sed -i "s/autologin-user=sky1/autologin-user=$USERNAME/" /etc/lightdm/lightdm.conf.d/50-autologin.conf
-        fi
 
         # Mark wizard as not needed
         mkdir -p /var/lib/sky1
         touch /var/lib/sky1/.wizard-done
-        echo "User $USERNAME created, wizard will be skipped"
+        echo "User $USERNAME created"
     fi
 
-    # Secure delete config file (contains password)
+    # --- SSH configuration ---
+    if [ "$SSH_ENABLED" = "yes" ]; then
+        echo "Enabling SSH server"
+        systemctl enable ssh.service 2>/dev/null || true
+    fi
+    if [ "$SSH_PASSWORD_AUTH" = "no" ]; then
+        echo "Disabling SSH password authentication"
+        mkdir -p /etc/ssh/sshd_config.d
+        echo "PasswordAuthentication no" > /etc/ssh/sshd_config.d/90-sky1-provision.conf
+    fi
+
+    # --- WiFi ---
+    # Accepts WIFI_PSK (pre-computed 256-bit hex from wpa_passphrase) or
+    # WIFI_PASSWORD (plaintext, converted to PSK here then discarded).
+    # Pre-computed PSK is preferred — avoids storing plaintext on the EFI partition.
+    if [ -n "$WIFI_SSID" ]; then
+        echo "Configuring WiFi: $WIFI_SSID"
+
+        # Derive PSK from plaintext password if no pre-computed PSK provided
+        local psk="$WIFI_PSK"
+        if [ -z "$psk" ] && [ -n "$WIFI_PASSWORD" ]; then
+            if command -v wpa_passphrase >/dev/null 2>&1; then
+                psk=$(wpa_passphrase "$WIFI_SSID" "$WIFI_PASSWORD" 2>/dev/null | \
+                      grep -oP '^\s+psk=\K[0-9a-f]{64}')
+            fi
+            # Fall back to plaintext if wpa_passphrase unavailable
+            [ -z "$psk" ] && psk="$WIFI_PASSWORD"
+        fi
+
+        local conn_file="/etc/NetworkManager/system-connections/${WIFI_SSID}.nmconnection"
+        mkdir -p /etc/NetworkManager/system-connections
+        cat > "$conn_file" << NMEOF
+[connection]
+id=${WIFI_SSID}
+type=wifi
+autoconnect=true
+
+[wifi]
+mode=infrastructure
+ssid=${WIFI_SSID}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${psk}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+NMEOF
+        chmod 600 "$conn_file"
+
+        # Set regulatory domain
+        if [ -n "$WIFI_COUNTRY" ]; then
+            echo "Setting WiFi regulatory domain: $WIFI_COUNTRY"
+            iw reg set "$WIFI_COUNTRY" 2>/dev/null || true
+            mkdir -p /etc/default
+            echo "REGDOMAIN=$WIFI_COUNTRY" > /etc/default/crda
+        fi
+    fi
+
+    # --- Secure delete config file (contains passwords/keys) ---
     echo "Removing pre-configuration file..."
     if command -v shred >/dev/null 2>&1; then
         shred -u "$FIRSTBOOT_CONFIG" 2>/dev/null || rm -f "$FIRSTBOOT_CONFIG"
