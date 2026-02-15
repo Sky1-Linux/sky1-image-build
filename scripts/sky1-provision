@@ -439,8 +439,8 @@ security:
     )
     parser.add_argument("--password", metavar="PASS", help="Set user password (will be hashed)")
     parser.add_argument(
-        "--ssh-key", metavar="FILE", dest="ssh_key",
-        help="Install SSH public key (path to .pub file)",
+        "--ssh-key", metavar="FILE_OR_KEY", dest="ssh_key",
+        help="SSH public key (path to .pub file or raw key string)",
     )
     parser.add_argument(
         "--ssh-enabled", choices=["yes", "no"], dest="ssh_enabled",
@@ -528,9 +528,12 @@ def main():
                 cfg.password_hash = hash_password(args.password)
             if args.ssh_key:
                 key_path = Path(os.path.expanduser(args.ssh_key))
-                if not key_path.is_file():
-                    die(f"SSH key file not found: {args.ssh_key}")
-                keys = key_path.read_text().strip().splitlines()
+                if key_path.is_file():
+                    keys = key_path.read_text().strip().splitlines()
+                elif args.ssh_key.startswith(("ssh-", "ecdsa-", "sk-")):
+                    keys = [args.ssh_key.strip()]
+                else:
+                    die(f"SSH key not found (not a file or key string): {args.ssh_key}")
                 cfg.ssh_authorized_keys = "\\n".join(keys)
             if args.ssh_enabled:
                 cfg.ssh_enabled = args.ssh_enabled

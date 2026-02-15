@@ -74,7 +74,7 @@ sudo PATH="$PATH" ./scripts/sky1-provision /dev/sdX \
 | `--user NAME` | Create user with sudo access | `USERNAME` |
 | `--password` | Prompt for password (hashed with SHA-512 crypt) | `PASSWORD_HASH` |
 | `--password-hash HASH` | Pre-hashed password (`$6$...` format) | `PASSWORD_HASH` |
-| `--ssh-key KEY` | SSH public key for the user (repeatable) | `SSH_AUTHORIZED_KEYS` |
+| `--ssh-key FILE_OR_KEY` | SSH public key file (.pub) or raw key string | `SSH_AUTHORIZED_KEYS` |
 | `--ssh-enabled` | Enable SSH server | `SSH_ENABLED=yes` |
 | `--ssh-no-password` | Disable SSH password auth (key-only) | `SSH_PASSWORD_AUTH=no` |
 | `--wifi-ssid SSID` | WiFi network name | `WIFI_SSID` |
