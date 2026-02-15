@@ -10,6 +10,20 @@ to first boot.
 3. Run `sky1-provision` to write configuration to the EFI partition
 4. Boot the device — configuration is applied automatically on first boot
 
+## Prerequisites
+
+The `sky1-provision` tool requires [uv](https://docs.astral.sh/uv/) (a Python package
+manager) to run. Install it if you don't have it:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+That's it — `uv` automatically manages the Python version the script needs. No venv
+or pip install required.
+
+> **Already have uv?** Check with `uv --version`. Any recent version works.
+
 ## Building the Server Image
 
 ```bash
@@ -72,14 +86,13 @@ sudo PATH="$PATH" ./scripts/sky1-provision /dev/sdX \
 |--------|-------------|------------|
 | `--hostname NAME` | System hostname | `HOSTNAME` |
 | `--user NAME` | Create user with sudo access | `USERNAME` |
-| `--password` | Prompt for password (hashed with SHA-512 crypt) | `PASSWORD_HASH` |
+| `--password PASS` | User password (hashed with SHA-512 crypt before writing) | `PASSWORD_HASH` |
 | `--password-hash HASH` | Pre-hashed password (`$6$...` format) | `PASSWORD_HASH` |
 | `--ssh-key FILE_OR_KEY` | SSH public key file (.pub) or raw key string | `SSH_AUTHORIZED_KEYS` |
-| `--ssh-enabled` | Enable SSH server | `SSH_ENABLED=yes` |
-| `--ssh-no-password` | Disable SSH password auth (key-only) | `SSH_PASSWORD_AUTH=no` |
+| `--ssh-enabled yes\|no` | Enable/disable SSH server (auto-enabled when key is set) | `SSH_ENABLED` |
+| `--ssh-password-auth yes\|no` | Allow SSH password login (default: yes) | `SSH_PASSWORD_AUTH` |
 | `--wifi-ssid SSID` | WiFi network name | `WIFI_SSID` |
-| `--wifi-password` | WiFi password (prompt, converted to PSK) | `WIFI_PSK` |
-| `--wifi-psk PSK` | Pre-computed WiFi PSK (64-char hex) | `WIFI_PSK` |
+| `--wifi-password PASS` | WiFi password (converted to PSK before writing) | `WIFI_PSK` |
 | `--wifi-country CC` | WiFi regulatory domain (e.g. `US`, `AU`) | `WIFI_COUNTRY` |
 | `--timezone TZ` | Timezone (e.g. `America/New_York`) | `TIMEZONE` |
 | `--locale LOCALE` | System locale (e.g. `en_US.UTF-8`) | `LOCALE` |
@@ -122,9 +135,8 @@ You can also write this file manually — just mount the EFI partition and creat
 
 - **Password**: Always stored as a SHA-512 crypt hash (`$6$...`), never plaintext.
   The `--password` flag prompts and hashes locally before writing.
-- **WiFi**: Use `--wifi-psk` with a pre-computed PSK (from `wpa_passphrase`) to
-  avoid storing the plaintext password. If `--wifi-password` is used, it's converted
-  to PSK before writing when `wpa_passphrase` is available.
+- **WiFi**: `--wifi-password` converts the password to a 256-bit WPA-PSK before
+  writing — the plaintext password is never stored on disk.
 - **Config file**: Shredded (overwritten with random data) on first boot after
   configuration is applied. Falls back to `rm -f` if `shred` is not available.
 - The EFI partition is FAT32 and readable by anyone with physical access to the
