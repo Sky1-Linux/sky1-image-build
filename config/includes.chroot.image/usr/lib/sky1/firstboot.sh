@@ -222,8 +222,11 @@ apply_preconfig() {
             if [ -n "$user_home" ]; then
                 echo "Installing SSH authorized keys for $USERNAME"
                 mkdir -p "$user_home/.ssh"
-                # Decode escaped newlines and append
-                printf '%b\n' "$SSH_AUTHORIZED_KEYS" > "$user_home/.ssh/authorized_keys"
+                # Replace literal \n sequences with actual newlines, then write
+                echo "$SSH_AUTHORIZED_KEYS" | sed 's/\\n/\n/g' > "$user_home/.ssh/authorized_keys"
+                local key_count
+                key_count=$(wc -l < "$user_home/.ssh/authorized_keys")
+                echo "Installed $key_count SSH key(s) ($(wc -c < "$user_home/.ssh/authorized_keys") bytes)"
                 chmod 700 "$user_home/.ssh"
                 chmod 600 "$user_home/.ssh/authorized_keys"
                 chown -R "$USERNAME:$USERNAME" "$user_home/.ssh"
