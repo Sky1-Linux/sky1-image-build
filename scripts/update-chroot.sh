@@ -67,6 +67,19 @@ echo ""
 # Fix DNS resolution
 cp /etc/resolv.conf "$CHROOT_DIR/etc/resolv.conf"
 
+# Mount /proc so apt-listbugs can work (needs ProcTable)
+PROC_MOUNTED=false
+if [ ! -d "$CHROOT_DIR/proc/1" ]; then
+    mount -t proc proc "$CHROOT_DIR/proc"
+    PROC_MOUNTED=true
+fi
+cleanup_proc() {
+    if $PROC_MOUNTED; then
+        umount "$CHROOT_DIR/proc" 2>/dev/null || true
+    fi
+}
+trap cleanup_proc EXIT
+
 # Remove raspi-firmware hooks that break non-RPi systems
 rm -f "$CHROOT_DIR/etc/initramfs/post-update.d/z50-raspi-firmware"
 rm -f "$CHROOT_DIR/etc/kernel/postinst.d/z50-raspi-firmware"
