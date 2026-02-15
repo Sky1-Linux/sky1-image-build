@@ -23,6 +23,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$BUILD_DIR"
 
+# Build state tracking
+. "$SCRIPT_DIR/build-state-lib.sh"
+
 DESKTOP="${1:-gnome}"
 TRACK="${2:-main}"
 EXPECTED_VERSION="$3"
@@ -236,6 +239,9 @@ if [ -n "$EXPECTED_VERSION" ]; then
         exit 1
     fi
 fi
+
+# Update build state
+record_track_state "$CHROOT_DIR" "$TRACK"
 
 echo ""
 echo "Next steps:"

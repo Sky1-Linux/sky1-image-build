@@ -20,6 +20,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$BUILD_DIR"
 
+# Build state tracking
+. "$SCRIPT_DIR/build-state-lib.sh"
+
 DESKTOPS="gnome kde xfce none"
 LOADOUTS="minimal desktop server developer"
 FORMATS="iso image"
@@ -117,6 +120,8 @@ generate_sky1_sources() {
 }
 
 # Generate sky1 package list based on track
+# Browsers, GStreamer, and ffmpeg are now in static package lists
+# (desktop-common.list.chroot and base.list.chroot)
 generate_sky1_packages() {
     cat << EOF
 # Sky1 Linux packages (from Sky1 apt repo)
@@ -128,17 +133,6 @@ linux-headers-sky1${KERNEL_SUFFIX}
 
 # Firmware
 sky1-firmware
-
-# Multimedia with hardware acceleration
-firefox
-ffmpeg
-chromium
-chromium-sky1-config
-
-# GStreamer with V4L2 AV1 support
-gstreamer1.0-plugins-good
-gstreamer1.0-pulseaudio
-gstreamer1.0-gtk3
 EOF
 }
 
@@ -178,6 +172,11 @@ ensure_chroot_track() {
     # Update apt sources for the track
     cp /etc/resolv.conf "$chroot_dir/etc/resolv.conf"
     generate_sky1_sources > "$sources_file"
+
+    # Ensure Sky1 GPG key is installed in the chroot
+    if [ -f "config/archives/sky1.key.chroot" ]; then
+        cp "config/archives/sky1.key.chroot" "$chroot_dir/etc/apt/trusted.gpg.d/sky1.asc"
+    fi
 
     # Remove raspi-firmware hooks
     rm -f "$chroot_dir/etc/initramfs/post-update.d/z50-raspi-firmware"
@@ -220,27 +219,33 @@ setup_chroot_symlink() {
         rm -f chroot
     fi
 
-    # If chroot exists as a real directory (legacy), warn but don't delete
+    # Handle orphan chroot directory from interrupted build
     if [ -d "chroot" ] && [ ! -L "chroot" ]; then
-        echo "Warning: 'chroot' exists as a directory, not a symlink."
-        echo "Consider moving it to desktop-choice/<desktop>/chroot for the appropriate desktop."
-        echo "Continuing with existing chroot..."
-        return
+        if [ -d "$CHROOT_DIR" ]; then
+            echo "Warning: Removing stale 'chroot' directory (real chroot at $CHROOT_DIR)"
+            sudo rm -rf chroot
+        else
+            echo "Recovering orphaned 'chroot' directory to $CHROOT_DIR..."
+            mkdir -p "$(dirname "$CHROOT_DIR")"
+            mv chroot "$CHROOT_DIR"
+        fi
     fi
 
     # Create symlink to desktop-specific chroot
     if [ -d "$CHROOT_DIR" ]; then
-        echo "Using existing chroot: $CHROOT_DIR"
         ln -sf "$CHROOT_DIR" chroot
-    else
-        echo "Will create new chroot: $CHROOT_DIR"
     fi
 }
 
 # Clean if requested
 if [ "$CLEAN" = "clean" ]; then
     echo "Cleaning previous build for $DESKTOP (track: $TRACK)..."
-    rm -f chroot
+    if [ -L "chroot" ]; then
+        rm -f chroot
+    elif [ -d "chroot" ]; then
+        echo "  Removing stale chroot directory..."
+        sudo rm -rf chroot
+    fi
     if [ -d "$CHROOT_DIR" ]; then
         sudo rm -rf "$CHROOT_DIR"
     fi
@@ -250,6 +255,21 @@ fi
 # Set up the chroot symlink
 setup_chroot_symlink
 
+# Validate chroot state — detect interrupted builds
+validate_chroot_state "$CHROOT_DIR"
+echo "Chroot: $CHROOT_ACTION ($CHROOT_ACTION_REASON)"
+
+if [ "$CHROOT_ACTION" = "force_clean" ]; then
+    echo ""
+    echo "Incomplete or corrupt chroot detected. Forcing clean rebuild..."
+    if [ -L "chroot" ]; then rm -f chroot; fi
+    if [ -d "chroot" ]; then sudo rm -rf chroot; fi
+    if [ -d "$CHROOT_DIR" ]; then sudo rm -rf "$CHROOT_DIR"; fi
+    sudo lb clean --purge 2>/dev/null || true
+elif [ "$CHROOT_ACTION" = "use_existing" ]; then
+    check_chroot_freshness "$CHROOT_DIR"
+fi
+
 # Apply desktop choice (use copies, not symlinks, so they survive lb clean)
 echo "Applying desktop choice: $DESKTOP..."
 if [ -f "$DESKTOP_DIR/package-lists/desktop.list.chroot" ]; then
@@ -258,6 +278,48 @@ fi
 if [ -f "$DESKTOP_DIR/hooks/live/0450-${DESKTOP}-config.hook.chroot" ]; then
     cp -f "$DESKTOP_DIR/hooks/live/0450-${DESKTOP}-config.hook.chroot" "config/hooks/live/0450-desktop-config.hook.chroot"
 fi
+
+# Filter package lists by @for tag
+#
+# Package lists in config/package-lists/ can have a "# @for: <target>" tag
+# on the first line to control which builds include them:
+#
+#   # @for: desktop        — any GUI desktop (gnome, kde, xfce), not headless
+#   # @for: <name>         — only that specific desktop
+#   (no tag)               — always included
+#
+# Non-matching lists are temporarily renamed to .skip during the build.
+filter_package_lists() {
+    local desktop="$1"
+    for f in config/package-lists/*.list.chroot; do
+        [ -f "$f" ] || continue
+        local tag
+        tag=$(sed -n '1s/^# @for:[[:space:]]*//p' "$f" 2>/dev/null || true)
+        [ -z "$tag" ] && continue  # no tag = always included
+
+        local include=false
+        if [ "$tag" = "$desktop" ]; then
+            include=true
+        elif [ "$tag" = "desktop" ] && [ "$desktop" != "none" ]; then
+            include=true
+        fi
+
+        if ! $include; then
+            echo "  Skipping $(basename "$f") (@for: $tag)"
+            mv "$f" "${f}.skip"
+        fi
+    done
+}
+
+# Restore any .skip files after build
+restore_package_lists() {
+    for f in config/package-lists/*.list.chroot.skip; do
+        [ -f "$f" ] && mv "$f" "${f%.skip}"
+    done
+}
+trap restore_package_lists EXIT
+
+filter_package_lists "$DESKTOP"
 
 # Copy desktop-specific includes (overlay into config/includes.chroot)
 if [ -d "$DESKTOP_DIR/includes.chroot" ]; then
@@ -292,10 +354,20 @@ finalize_chroot() {
 if [ ! -d "$CHROOT_DIR" ] && [ ! -d "chroot" ]; then
     echo ""
     echo "No chroot found for $DESKTOP. Building chroot..."
+
     sudo lb bootstrap 2>&1 | tee build.log
+
+    # Record bootstrap completion (writes to 'chroot/' which lb just created)
+    record_stage_complete "chroot" "BOOTSTRAP"
+    write_build_state "chroot" "DESKTOP" "$DESKTOP"
+
     sudo lb chroot 2>&1 | tee -a build.log
 
-    # Finalize chroot naming
+    # Record chroot stage completion
+    record_stage_complete "chroot" "CHROOT"
+    write_build_state "chroot" "PKGLIST_HASH" "$(compute_pkglist_hash)"
+
+    # Move chroot/ to desktop-specific path
     finalize_chroot
 fi
 
@@ -306,6 +378,7 @@ fi
 
 # Ensure chroot has the right kernel for the requested track
 ensure_chroot_track "$CHROOT_DIR"
+record_track_state "$CHROOT_DIR" "$TRACK"
 
 # Build based on format
 if [ "$FORMAT" = "iso" ]; then
@@ -329,7 +402,7 @@ if [ "$FORMAT" = "iso" ]; then
 elif [ "$FORMAT" = "image" ]; then
     echo ""
     echo "Building disk image..."
-    sudo ./scripts/build-image.sh "$DESKTOP" "$LOADOUT" "$TRACK"
+    sudo SKIP_COMPRESS="${SKIP_COMPRESS:-}" ./scripts/build-image.sh "$DESKTOP" "$LOADOUT" "$TRACK"
 fi
 
 echo ""
