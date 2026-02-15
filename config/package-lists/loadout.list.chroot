@@ -1,27 +1,33 @@
-# Desktop loadout
-# Full desktop experience with browsers, office, and multimedia
+# Server loadout
+# Additional packages for headless server deployments
+# (base packages already include monitoring, networking, scripting basics)
 
-# ===== Web Browsers =====
-# (firefox and chromium are in sky1.list.chroot with HW accel configs)
+# ===== Remote Access =====
+openssh-server
+mosh
 
-# ===== Office Suite =====
-libreoffice-writer
-libreoffice-calc
-libreoffice-impress
-libreoffice-gtk3
+# ===== Containers =====
+podman
+buildah
+skopeo
 
-# ===== Multimedia =====
-vlc
-rhythmbox
-gnome-snapshot
-shotwell
+# ===== Advanced Monitoring =====
+nethogs
+iftop
+nmon
+prometheus-node-exporter
 
-# ===== Graphics =====
-gimp
-inkscape
+# ===== Security =====
+fail2ban
+ufw
+apparmor
+apparmor-utils
 
-# ===== Communication =====
-thunderbird
+# ===== Advanced Networking =====
+nmap
+socat
+netcat-openbsd
+haproxy
 
-# ===== PDF =====
-# (evince/okular/atril provided by desktop choice)
+# ===== Automation =====
+ansible

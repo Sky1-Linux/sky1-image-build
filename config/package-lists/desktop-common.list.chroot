@@ -1,0 +1,53 @@
+# @for: desktop
+# Common packages for desktop builds (gnome, kde, xfce)
+# Excluded from headless (none) builds via @for tag
+
+# ===== Desktop Networking =====
+avahi-daemon
+
+# ===== Desktop D-Bus / PolicyKit =====
+dbus-user-session
+pkexec
+
+# ===== Power Management (interactive) =====
+powertop
+
+# ===== Audio =====
+pipewire
+pipewire-pulse
+pipewire-alsa
+pipewire-audio
+wireplumber
+alsa-utils
+alsa-ucm-conf
+
+# ===== Bluetooth =====
+bluez
+bluez-obexd
+
+# ===== Graphics (Mesa/Vulkan) =====
+mesa-vulkan-drivers
+libgl1-mesa-dri
+libegl-mesa0
+libgles2
+libglx-mesa0
+vulkan-tools
+
+# ===== GUI System Tools =====
+gparted
+gnome-disk-utility
+
+# ===== Printing =====
+cups
+cups-browsed
+printer-driver-all
+
+# ===== Browsers (Sky1 apt repo — HW-accelerated builds) =====
+firefox
+chromium
+chromium-sky1-config
+
+# ===== GStreamer (V4L2 AV1 support) =====
+gstreamer1.0-plugins-good
+gstreamer1.0-pulseaudio
+gstreamer1.0-gtk3

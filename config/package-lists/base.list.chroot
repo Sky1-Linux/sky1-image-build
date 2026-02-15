@@ -1,5 +1,5 @@
-# Base packages for all Sky1 Linux builds
-# These are essential system packages shared across all desktops and loadouts
+# Base packages for ALL Sky1 Linux builds (including headless)
+# Keep this minimal — desktop-only packages go in desktop-common.list.chroot
 
 # ===== Networking =====
 network-manager
@@ -7,44 +7,19 @@ wpasupplicant
 wireless-regdb
 iw
 rfkill
-avahi-daemon
 openssh-client
-
-# ===== Bluetooth =====
-bluez
-bluez-obexd
-
-# ===== Audio =====
-pipewire
-pipewire-pulse
-pipewire-alsa
-pipewire-audio
-wireplumber
-alsa-utils
-alsa-ucm-conf
 
 # ===== Firmware =====
 firmware-linux
 firmware-realtek
 firmware-iwlwifi
 
-# ===== Graphics (Mesa/Vulkan) =====
-mesa-vulkan-drivers
-libgl1-mesa-dri
-libegl-mesa0
-libgles2
-libglx-mesa0
-vulkan-tools
-
 # ===== D-Bus and PolicyKit =====
 dbus
-dbus-user-session
 polkitd
-pkexec
 
 # ===== Power Management =====
 linux-cpupower
-powertop
 lm-sensors
 i2c-tools
 
@@ -87,18 +62,11 @@ xfsprogs
 apt-listbugs
 apt-listchanges
 
-# ===== System Tools =====
-gparted
-gnome-disk-utility
+# ===== System Tools (CLI only) =====
 smartmontools
 parted
 fdisk
 gdisk
-
-# ===== Printing =====
-cups
-cups-browsed
-printer-driver-all
 
 # ===== Localization =====
 locales
@@ -106,9 +74,9 @@ console-setup
 keyboard-configuration
 
 # ===== Monitoring =====
+auditd
 iotop
 sysstat
-dstat
 
 # ===== Network Tools =====
 net-tools
@@ -136,3 +104,6 @@ python3
 python3-pip
 python3-venv
 # uv - install via hook (not in Debian repos)
+
+# ===== Multimedia (Sky1 apt repo — HW-accelerated build) =====
+ffmpeg

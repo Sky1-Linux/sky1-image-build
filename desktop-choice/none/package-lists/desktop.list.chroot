@@ -1,8 +1,20 @@
 # Headless (no desktop environment)
-# Only essential packages for server/CLI use
+# Server/CLI packages only — no X11, no display manager
 
 # SSH server for remote access
 openssh-server
 
-# TTY improvements
+# Terminal multiplexer (screen; tmux is already in base)
 screen
+
+# Server monitoring (web-based at :9090)
+cockpit
+
+# Web server (automatic HTTPS, reverse proxy)
+caddy
+
+# Firewall
+ufw
+
+# Container runtime
+podman

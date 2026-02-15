@@ -7,8 +7,6 @@ openssh-server
 mosh
 
 # ===== Containers =====
-docker.io
-docker-compose
 podman
 buildah
 skopeo
@@ -30,9 +28,6 @@ nmap
 socat
 netcat-openbsd
 haproxy
-
-# ===== Web Servers =====
-nginx
 
 # ===== Automation =====
 ansible

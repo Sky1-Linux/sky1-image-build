@@ -1,0 +1,115 @@
+#!/bin/bash
+# Headless/server configuration for Sky1 Linux
+# No display manager, no GUI — console and SSH only
+
+set -e
+
+echo "Configuring headless server..."
+
+# Remove any display-manager service symlink (no GUI on headless)
+rm -f /etc/systemd/system/display-manager.service
+
+# Enable NetworkManager for headless WiFi provisioning
+if [ -d /etc/NetworkManager ]; then
+    mkdir -p /etc/NetworkManager/conf.d
+    cat > /etc/NetworkManager/conf.d/10-headless.conf << 'EOF'
+[main]
+auth-polkit=false
+
+[keyfile]
+unmanaged-devices=none
+EOF
+fi
+
+# Enable SSH server by default on headless images
+# Disable ssh.socket (socket activation conflicts with direct ssh.service)
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service 2>/dev/null || true
+rm -f /etc/systemd/system/sockets.target.wants/ssh.socket
+ln -sf /dev/null /etc/systemd/system/ssh.socket
+
+# Set default target to multi-user (no graphical)
+ln -sf /lib/systemd/system/multi-user.target /etc/systemd/system/default.target
+
+# Enable serial console (auto-detected from kernel console= parameter at boot)
+# systemd-getty-generator handles this automatically — no hardcoded device needed
+
+# Disable systemd-networkd (conflicts with NetworkManager)
+# Must mask service AND all sockets — sockets refuse to listen if service is masked
+rm -f /etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+ln -sf /dev/null /etc/systemd/system/systemd-networkd.service
+ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
+ln -sf /dev/null /etc/systemd/system/systemd-networkd.socket
+ln -sf /dev/null /etc/systemd/system/systemd-networkd-varlink.socket
+ln -sf /dev/null /etc/systemd/system/systemd-networkd-resolve-hook.socket
+
+# Disable caddy-api (use Caddyfile mode only)
+rm -f /etc/systemd/system/multi-user.target.wants/caddy-api.service
+
+# Mask IPMI services (no BMC on Sky1 boards; SysV scripts must be masked, not just unlinked)
+ln -sf /dev/null /etc/systemd/system/openipmi.service
+ln -sf /dev/null /etc/systemd/system/ipmievd.service
+
+# Disable nginx (Caddy is the default web server; nginx available but not auto-started)
+rm -f /etc/systemd/system/multi-user.target.wants/nginx.service
+
+# Configure firewall — deny incoming by default, allow SSH and Cockpit
+# Write config files directly (can't run ufw commands in chroot — no kernel modules)
+sed -i 's/^ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
+sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/' /etc/default/ufw
+sed -i 's/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/' /etc/default/ufw
+
+# Add user rules for SSH and Cockpit
+cat > /etc/ufw/user.rules << 'RULES'
+*filter
+:ufw-user-input - [0:0]
+:ufw-user-output - [0:0]
+:ufw-user-forward - [0:0]
+:ufw-user-limit - [0:0]
+:ufw-user-limit-accept - [0:0]
+### RULES ###
+### tuple ### allow tcp 22 0.0.0.0/0 any 0.0.0.0/0 in comment=SSH
+-A ufw-user-input -p tcp --dport 22 -j ACCEPT
+### tuple ### allow tcp 9090 0.0.0.0/0 any 0.0.0.0/0 in comment=Cockpit
+-A ufw-user-input -p tcp --dport 9090 -j ACCEPT
+### END RULES ###
+-A ufw-user-input -j RETURN
+-A ufw-user-output -j RETURN
+-A ufw-user-forward -j RETURN
+-A ufw-user-limit -m limit --limit 3/minute -j LOG --log-prefix "[UFW LIMIT BLOCK] "
+-A ufw-user-limit -j REJECT
+-A ufw-user-limit-accept -j ACCEPT
+COMMIT
+RULES
+
+cat > /etc/ufw/user6.rules << 'RULES'
+*filter
+:ufw6-user-input - [0:0]
+:ufw6-user-output - [0:0]
+:ufw6-user-forward - [0:0]
+:ufw6-user-limit - [0:0]
+:ufw6-user-limit-accept - [0:0]
+### RULES ###
+### tuple ### allow tcp 22 ::/0 any ::/0 in comment=SSH
+-A ufw6-user-input -p tcp --dport 22 -j ACCEPT
+### tuple ### allow tcp 9090 ::/0 any ::/0 in comment=Cockpit
+-A ufw6-user-input -p tcp --dport 9090 -j ACCEPT
+### END RULES ###
+-A ufw6-user-input -j RETURN
+-A ufw6-user-output -j RETURN
+-A ufw6-user-forward -j RETURN
+-A ufw6-user-limit -m limit --limit 3/minute -j LOG --log-prefix "[UFW LIMIT BLOCK] "
+-A ufw6-user-limit -j REJECT
+-A ufw6-user-limit-accept -j ACCEPT
+COMMIT
+RULES
+
+# Set a simple MOTD for SSH login
+cat > /etc/motd << 'EOF'
+
+  Sky1 Linux (headless)
+  https://github.com/Sky1-Linux
+
+EOF
+
+echo "Headless server configuration complete."
